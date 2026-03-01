@@ -1,0 +1,5 @@
+Client: Acme Corp
+Invoice #: INV-2026-001
+Amount: $1,500.00
+Due Date: 2026-03-05
+Services: AI consulting — February 2026

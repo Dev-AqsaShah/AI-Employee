@@ -1,0 +1,21 @@
+# AI Employee — Python dependencies
+# Install with: uv pip install -r requirements.txt
+
+# ── Bronze Tier (core) ─────────────────────────────────────────────────────────
+watchdog>=4.0.0
+python-dotenv>=1.0.0
+
+# ── Silver Tier — Gmail Watcher ────────────────────────────────────────────────
+google-auth>=2.0.0
+google-auth-oauthlib>=1.0.0
+google-api-python-client>=2.0.0
+
+# ── Silver Tier — Email MCP Server ────────────────────────────────────────────
+mcp>=1.0.0
+
+# ── Silver Tier — WhatsApp / Browser Automation ───────────────────────────────
+# playwright>=1.40.0
+# After installing: playwright install chromium
+
+# ── Gold Tier (future) ─────────────────────────────────────────────────────────
+# requests>=2.31.0   (for LinkedIn API, Banking APIs)

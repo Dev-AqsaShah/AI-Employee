@@ -1,0 +1,53 @@
+# =========================
+# 🔐 Secrets — Never Commit
+# =========================
+.env
+*.env
+.env.*
+credentials/
+credentials/*.json
+gmail_token.json
+gmail_credentials.json
+
+# =========================
+# 🐍 Python
+# =========================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# =========================
+# 📂 Drop folder contents (keep folder)
+# =========================
+drop_folder/*
+!drop_folder/.gitkeep
+
+# =========================
+# 📱 WhatsApp session
+# =========================
+whatsapp_session/
+
+# =========================
+# 🖥 OS Files
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# 📝 Logs
+# =========================
+AI_Employee_Vault/Logs/*.log
+*.log
+
+# =========================
+# 🟢 Node (Future MCP Servers)
+# =========================
+node_modules/
+package-lock.json
