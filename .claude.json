@@ -4,6 +4,11 @@
       "command": "python",
       "args": ["mcp_server/email_mcp.py"],
       "env": {}
+    },
+    "ai-employee-odoo": {
+      "command": "python",
+      "args": ["mcp_server/odoo_mcp.py"],
+      "env": {}
     }
   }
 }

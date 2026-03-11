@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Done/EMAIL_20260227_194726_19c9f8c428f5.md",
+                "file": "Approved/FACEBOOK_2026-03-10.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "EMAIL_20260227_194726_19c9f8c428f5"
+              "title": "FACEBOOK_2026-03-10"
             }
           }
         ]
@@ -94,7 +94,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "Done/EMAIL_20260227_194726_19c9f8c428f5.md",
+                "file": "Approved/FACEBOOK_2026-03-10.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -104,7 +104,7 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "Backlinks for EMAIL_20260227_194726_19c9f8c428f5"
+              "title": "Backlinks for FACEBOOK_2026-03-10"
             }
           },
           {
@@ -113,12 +113,12 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "Done/EMAIL_20260227_194726_19c9f8c428f5.md",
+                "file": "Approved/FACEBOOK_2026-03-10.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
               "icon": "links-going-out",
-              "title": "Outgoing links from EMAIL_20260227_194726_19c9f8c428f5"
+              "title": "Outgoing links from FACEBOOK_2026-03-10"
             }
           },
           {
@@ -156,13 +156,13 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "Done/EMAIL_20260227_194726_19c9f8c428f5.md",
+                "file": "Approved/FACEBOOK_2026-03-10.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "Outline of EMAIL_20260227_194726_19c9f8c428f5"
+              "title": "Outline of FACEBOOK_2026-03-10"
             }
           }
         ]
@@ -185,8 +185,11 @@
   },
   "active": "20b10e37dcb9f00e",
   "lastOpenFiles": [
-    "Done/DRAFT_EMAIL_test_20260228.md",
     "Done/APPROVAL_EMAIL_Google_2FA_20260228.md",
+    "Logs/2026-03-10.log",
+    "Approved/FACEBOOK_2026-03-10.md",
+    "Done/DRAFT_EMAIL_test_20260228.md",
+    "Done/EMAIL_20260227_194726_19c9f8c428f5.md",
     "Done/APPROVAL_EMAIL_Binance_Promo_20260228.md",
     "Done/FILE_20260226_220125_test_invoice.md",
     "Needs_Action/EMAIL_20260301_194923_19ca55292c0d.md",
@@ -215,11 +218,7 @@
     "Done/EMAIL_20260227_194937_19c426a289bc.md",
     "Done/EMAIL_20260227_194937_19c48257550c.md",
     "Done/EMAIL_20260227_194936_19c506ffd8c6.md",
-    "Done/EMAIL_20260227_194735_19c5133806d0.md",
-    "Done/EMAIL_20260227_194734_19c55982640d.md",
-    "Done/EMAIL_20260227_194733_19c60dd829c6.md",
     "Logs/2026-02-28.log",
-    "Dashboard.md.tmp.14267.1772209293360",
-    "Logs/2026-02-27.log"
+    "Dashboard.md.tmp.14267.1772209293360"
   ]
 }

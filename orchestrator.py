@@ -1,5 +1,5 @@
 """
-orchestrator.py — Master process for the AI Employee (Silver Tier)
+orchestrator.py — Master process for the AI Employee (Gold Tier)
 
 Manages all watchers, handles scheduling, and monitors process health.
 
@@ -9,9 +9,13 @@ Usage:
 What it does:
   1. Starts filesystem_watcher in a subprocess
   2. Starts gmail_watcher in a subprocess (if credentials exist)
-  3. Runs a daily briefing at the configured time
-  4. Monitors all subprocesses and restarts on crash
-  5. Checks for STOP.md to halt all operations
+  3. Starts linkedin_watcher in a subprocess (if LINKEDIN_EMAIL set)
+  4. Starts email_watcher in a subprocess (if EMAIL_FROM set)
+  5. Starts facebook_watcher in a subprocess (if FB_PAGE_ID set)
+  6. Runs a daily briefing at the configured time
+  7. Runs LinkedIn + Facebook post schedulers after briefing
+  8. Monitors all subprocesses and restarts on crash
+  9. Checks for STOP.md to halt all operations
 """
 
 import os
@@ -151,8 +155,9 @@ class DailyScheduler(threading.Thread):
             logger.error(f"Briefing exception: {e}")
             log_event("BRIEFING_EXCEPTION", str(e))
 
-        # Run LinkedIn post scheduler after briefing
+        # Run content schedulers after briefing
         self._run_linkedin_scheduler()
+        self._run_facebook_scheduler()
 
     def _run_linkedin_scheduler(self):
         logger.info("Running LinkedIn post scheduler...")
@@ -169,6 +174,26 @@ class DailyScheduler(threading.Thread):
         except Exception as e:
             logger.error(f"LinkedIn scheduler exception: {e}")
             log_event("LINKEDIN_SCHEDULER_ERROR", str(e))
+
+    def _run_facebook_scheduler(self):
+        logger.info("Running Facebook post scheduler...")
+        fb_page_id = os.getenv("FACEBOOK_EMAIL", "")
+        if not fb_page_id:
+            logger.info("Facebook scheduler: FACEBOOK_EMAIL not set — skipping")
+            return
+        try:
+            result = subprocess.run(
+                [self.python, "schedulers/facebook_scheduler.py"],
+                capture_output=True, text=True, timeout=60
+            )
+            if result.returncode == 0:
+                logger.info("Facebook scheduler complete.")
+                log_event("FACEBOOK_SCHEDULER_DONE", result.stdout.strip()[:200])
+            else:
+                logger.warning(f"Facebook scheduler: {result.stderr[:200]}")
+        except Exception as e:
+            logger.error(f"Facebook scheduler exception: {e}")
+            log_event("FACEBOOK_SCHEDULER_ERROR", str(e))
 
 
 # ── Main Orchestrator ──────────────────────────────────────────────────────────
@@ -216,11 +241,19 @@ class Orchestrator:
             enabled=bool(email_from),
         ))
 
+        # Facebook watcher — enabled if FACEBOOK_EMAIL configured
+        fb_email = os.getenv("FACEBOOK_EMAIL", "")
+        processes.append(ManagedProcess(
+            name="facebook-watcher",
+            cmd=[python, "watchers/facebook_watcher.py"],
+            enabled=bool(fb_email),
+        ))
+
         return processes
 
     def start(self):
         logger.info("=" * 50)
-        logger.info("AI Employee Orchestrator starting (Silver Tier)")
+        logger.info("AI Employee Orchestrator starting (Gold Tier)")
         logger.info(f"Vault: {VAULT_PATH.resolve()}")
         logger.info(f"Python: {self.python}")
         logger.info(f"Daily briefing at: {BRIEFING_HOUR:02d}:00")

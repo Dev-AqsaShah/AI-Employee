@@ -1,0 +1,61 @@
+version: "3.8"
+
+# ── AI Employee — Odoo + PostgreSQL ─────────────────────────────────────────────
+# Odoo Community 17 with PostgreSQL 15
+#
+# Usage:
+#   docker compose up -d          # Start in background
+#   docker compose logs -f odoo   # Watch logs
+#   docker compose down           # Stop
+#   docker compose down -v        # Stop + delete data (careful!)
+#
+# First-time setup:
+#   1. Run: docker compose up -d
+#   2. Open: http://localhost:8069
+#   3. Create database (name: odoo, master password: from ODOO_MASTER_PASSWORD)
+#   4. Install apps: Accounting, Invoicing
+#   5. Set ODOO_DB, ODOO_USER, ODOO_PASSWORD in .env
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: ai_employee_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       ${POSTGRES_DB:-odoo}
+      POSTGRES_USER:     ${POSTGRES_USER:-odoo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-odoo_secret}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-odoo}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  odoo:
+    image: odoo:17.0
+    container_name: ai_employee_odoo
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      HOST:     db
+      PORT:     5432
+      USER:     ${POSTGRES_USER:-odoo}
+      PASSWORD: ${POSTGRES_PASSWORD:-odoo_secret}
+    ports:
+      - "8069:8069"
+    volumes:
+      - odoo_data:/var/lib/odoo
+      - ./odoo_addons:/mnt/extra-addons   # Custom addons (optional)
+    command: --db_host=db --db_port=5432 --db_user=${POSTGRES_USER:-odoo} --db_password=${POSTGRES_PASSWORD:-odoo_secret}
+
+volumes:
+  postgres_data:
+    name: ai_employee_postgres_data
+  odoo_data:
+    name: ai_employee_odoo_data
