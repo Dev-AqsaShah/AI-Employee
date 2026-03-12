@@ -158,6 +158,12 @@ class DailyScheduler(threading.Thread):
         # Run content schedulers after briefing
         self._run_linkedin_scheduler()
         self._run_facebook_scheduler()
+        self._run_instagram_scheduler()
+        self._run_twitter_scheduler()
+
+        # Run CEO briefing on Mondays
+        if datetime.now().strftime("%A") == "Monday":
+            self._run_ceo_briefing()
 
     def _run_linkedin_scheduler(self):
         logger.info("Running LinkedIn post scheduler...")
@@ -194,6 +200,57 @@ class DailyScheduler(threading.Thread):
         except Exception as e:
             logger.error(f"Facebook scheduler exception: {e}")
             log_event("FACEBOOK_SCHEDULER_ERROR", str(e))
+
+    def _run_instagram_scheduler(self):
+        ig_user = os.getenv("INSTAGRAM_USERNAME", "")
+        if not ig_user:
+            return
+        try:
+            result = subprocess.run(
+                [self.python, "schedulers/instagram_scheduler.py"],
+                capture_output=True, text=True, timeout=60
+            )
+            if result.returncode == 0:
+                logger.info("Instagram scheduler complete.")
+                log_event("INSTAGRAM_SCHEDULER_DONE", result.stdout.strip()[:200])
+            else:
+                logger.warning(f"Instagram scheduler: {result.stderr[:200]}")
+        except Exception as e:
+            logger.error(f"Instagram scheduler exception: {e}")
+
+    def _run_twitter_scheduler(self):
+        tw_user = os.getenv("TWITTER_USERNAME", "")
+        if not tw_user:
+            return
+        try:
+            result = subprocess.run(
+                [self.python, "schedulers/twitter_scheduler.py"],
+                capture_output=True, text=True, timeout=60
+            )
+            if result.returncode == 0:
+                logger.info("Twitter scheduler complete.")
+                log_event("TWITTER_SCHEDULER_DONE", result.stdout.strip()[:200])
+            else:
+                logger.warning(f"Twitter scheduler: {result.stderr[:200]}")
+        except Exception as e:
+            logger.error(f"Twitter scheduler exception: {e}")
+
+    def _run_ceo_briefing(self):
+        logger.info("Running CEO Weekly Briefing (Monday)...")
+        try:
+            result = subprocess.run(
+                [self.python, "schedulers/ceo_briefing.py"],
+                capture_output=True, text=True, timeout=120
+            )
+            if result.returncode == 0:
+                logger.info("CEO Briefing complete.")
+                log_event("CEO_BRIEFING_DONE", result.stdout.strip()[:200])
+            else:
+                logger.warning(f"CEO Briefing error: {result.stderr[:200]}")
+                log_event("CEO_BRIEFING_ERROR", result.stderr[:200])
+        except Exception as e:
+            logger.error(f"CEO Briefing exception: {e}")
+            log_event("CEO_BRIEFING_EXCEPTION", str(e))
 
 
 # ── Main Orchestrator ──────────────────────────────────────────────────────────
@@ -247,6 +304,29 @@ class Orchestrator:
             name="facebook-watcher",
             cmd=[python, "watchers/facebook_watcher.py"],
             enabled=bool(fb_email),
+        ))
+
+        # Instagram watcher — enabled if INSTAGRAM_USERNAME configured
+        ig_user = os.getenv("INSTAGRAM_USERNAME", "")
+        processes.append(ManagedProcess(
+            name="instagram-watcher",
+            cmd=[python, "watchers/instagram_watcher.py"],
+            enabled=bool(ig_user),
+        ))
+
+        # Twitter watcher — enabled if TWITTER_USERNAME configured
+        tw_user = os.getenv("TWITTER_USERNAME", "")
+        processes.append(ManagedProcess(
+            name="twitter-watcher",
+            cmd=[python, "watchers/twitter_watcher.py"],
+            enabled=bool(tw_user),
+        ))
+
+        # Ralph watcher — always enabled (task chain daemon)
+        processes.append(ManagedProcess(
+            name="ralph-watcher",
+            cmd=[python, "watchers/ralph_watcher.py"],
+            enabled=True,
         ))
 
         return processes

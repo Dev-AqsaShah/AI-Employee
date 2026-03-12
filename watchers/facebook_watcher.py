@@ -114,9 +114,8 @@ class FacebookPoster:
 
         with sync_playwright() as p:
             browser = p.chromium.launch(
-                channel="chrome",
                 headless=False,
-                args=["--start-maximized"],
+                args=["--start-maximized", "--no-sandbox"],
             )
             context = browser.new_context(viewport={"width": 1280, "height": 800})
             page    = context.new_page()
@@ -158,11 +157,10 @@ class FacebookPoster:
 
         try:
             with sync_playwright() as p:
-                logger.info("Launching Chrome browser...")
+                logger.info("Launching browser (headless)...")
                 browser = p.chromium.launch(
-                    channel="chrome",
-                    headless=False,
-                    args=["--start-maximized"],
+                    headless=True,
+                    args=["--no-sandbox", "--disable-dev-shm-usage"],
                 )
                 context = browser.new_context(
                     storage_state=str(session_file),
@@ -230,7 +228,6 @@ class FacebookPoster:
                         continue
 
                 # ── Navigate to Meta Business Suite composer ───────────────────
-                # This is the most reliable way to post on a Facebook Page
                 logger.info("Navigating to Meta Business Suite post composer...")
                 page.goto(
                     "https://business.facebook.com/latest/composer/",
@@ -238,67 +235,57 @@ class FacebookPoster:
                 )
                 time.sleep(5)
                 page.screenshot(path=str(debug_dir / "fb_composer_page.png"))
-                logger.info("Screenshot saved: debug_screenshots/fb_composer_page.png")
+                logger.info("Screenshot: debug_screenshots/fb_composer_page.png")
 
-                # ── Open post composer ─────────────────────────────────────────
-                logger.info("Opening post composer...")
-                clicked = False
-
-                for sel in [
-                    "[aria-label='Write something...']",
-                    "[aria-placeholder='Write something...']",
-                    "[aria-label=\"What's on your mind?\"]",
-                    "div[data-lexical-editor='true']",
-                    "div[contenteditable='true']",
-                    "div[role='textbox']",
-                    "textarea",
+                # ── Dismiss any popups / tooltips ──────────────────────────────
+                logger.info("Dismissing any popups...")
+                for dismiss_sel in [
+                    "div[aria-label='Close']",
+                    "div[aria-label='Dismiss']",
+                    "button[aria-label='Close']",
                 ]:
                     try:
-                        el = page.wait_for_selector(sel, timeout=6000)
-                        if el and el.is_visible():
-                            el.click()
-                            clicked = True
-                            logger.info(f"Opened composer: {sel}")
-                            break
+                        btns = page.query_selector_all(dismiss_sel)
+                        for btn in btns:
+                            if btn.is_visible():
+                                btn.click()
+                                time.sleep(1)
                     except Exception:
-                        continue
+                        pass
 
-                if not clicked:
-                    page.screenshot(path=str(debug_dir / "fb_scrolled.png"))
-                    logger.info("Screenshot saved: debug_screenshots/fb_scrolled.png")
+                # Dismiss "Got it" / "OK" tooltips by text
+                for got_it_text in ["Got it", "OK", "Dismiss", "Not now"]:
+                    try:
+                        btn = page.get_by_role("button", name=got_it_text)
+                        if btn.is_visible(timeout=2000):
+                            btn.click()
+                            time.sleep(1)
+                            logger.info(f"Dismissed popup: '{got_it_text}'")
+                    except Exception:
+                        pass
 
-                # Screenshot 2 — after clicking composer
-                page.screenshot(path=str(debug_dir / "fb_2_after_click.png"))
-                logger.info(f"Screenshot saved: debug_screenshots/fb_2_after_click.png")
+                time.sleep(2)
+                page.screenshot(path=str(debug_dir / "fb_2_after_dismiss.png"))
+                logger.info("Screenshot: debug_screenshots/fb_2_after_dismiss.png")
 
-                if not clicked:
-                    raise RuntimeError(
-                        "Could not open post composer. "
-                        "Check debug_screenshots/fb_1_page_loaded.png"
-                    )
-
-                # Wait for post dialog to fully open
-                time.sleep(4)
-
-                # Screenshot 3 — after waiting for modal
-                page.screenshot(path=str(debug_dir / "fb_3_modal.png"))
-                logger.info(f"Screenshot saved: debug_screenshots/fb_3_modal.png")
-
-                # ── Type post content ──────────────────────────────────────────
+                # ── Find text area in composer ─────────────────────────────────
+                # Meta Business Suite composer has a textarea under "Text" label
+                logger.info("Finding post text area...")
                 editor = None
+
                 editor_selectors = [
-                    "div[data-lexical-editor='true']",
-                    "div[contenteditable='true'][spellcheck='true']",
-                    "div[role='textbox'][contenteditable='true']",
-                    "div[aria-label=\"What's on your mind?\"]",
-                    "div[aria-label='Write something...']",
-                    "div.notranslate[contenteditable='true']",
-                    "div[contenteditable='true']",
-                    "div[role='textbox']",
+                    "textarea[placeholder]",                          # plain textarea
+                    "textarea",                                       # any textarea
+                    "div[contenteditable='true'][spellcheck='true']", # rich text
+                    "div[data-lexical-editor='true']",                # Lexical editor
+                    "div[role='textbox'][contenteditable='true']",    # ARIA textbox
+                    "div[contenteditable='true']",                    # any contenteditable
+                    "div[role='textbox']",                            # role textbox
                 ]
+
                 for ed_sel in editor_selectors:
                     try:
-                        editor = page.wait_for_selector(ed_sel, timeout=4000)
+                        editor = page.wait_for_selector(ed_sel, timeout=5000)
                         if editor and editor.is_visible():
                             logger.info(f"Found editor: {ed_sel}")
                             break
@@ -310,31 +297,34 @@ class FacebookPoster:
                     page.screenshot(path=str(debug_dir / "fb_error_no_editor.png"))
                     raise RuntimeError(
                         "Could not find the post text editor. "
-                        "Check debug_screenshots/fb_3_modal.png to see what opened."
+                        "Check debug_screenshots/fb_composer_page.png"
                     )
 
+                # Screenshot 3 — before typing
+                page.screenshot(path=str(debug_dir / "fb_3_modal.png"))
+                logger.info("Screenshot: debug_screenshots/fb_3_modal.png")
+
+                # ── Type post content ──────────────────────────────────────────
                 editor.click()
                 time.sleep(1)
                 page.keyboard.type(content, delay=30)
                 time.sleep(2)
 
-                # ── Click Post/Share submit button ─────────────────────────────
+                # Screenshot 4 — after typing, before submit
+                page.screenshot(path=str(debug_dir / "fb_4_before_post_btn.png"))
+                logger.info("Screenshot: debug_screenshots/fb_4_before_post_btn.png")
+
+                # ── Click Publish / Post button ────────────────────────────────
                 posted = False
 
-                # Take screenshot before clicking to see what's on screen
-                page.screenshot(path=str(debug_dir / "fb_4_before_post_btn.png"))
-
-                # Try role-based first
-                for btn_name in ["Post", "Share", "Publish"]:
+                # "Publish" is the button in Meta Business Suite
+                for btn_name in ["Publish", "Post", "Share"]:
                     try:
-                        btns = page.get_by_role("button", name=btn_name).all()
-                        for btn in reversed(btns):
-                            if btn.is_visible() and btn.is_enabled():
-                                btn.click(timeout=5000)
-                                posted = True
-                                logger.info(f"Clicked submit: {btn_name}")
-                                break
-                        if posted:
+                        btn = page.get_by_role("button", name=btn_name)
+                        if btn.is_visible(timeout=3000) and btn.is_enabled():
+                            btn.click()
+                            posted = True
+                            logger.info(f"Clicked: '{btn_name}'")
                             break
                     except Exception:
                         continue
@@ -342,22 +332,24 @@ class FacebookPoster:
                 # CSS fallback
                 if not posted:
                     for sel in [
+                        "button:has-text('Publish')",
+                        "button:has-text('Post')",
+                        "div[aria-label='Publish'][role='button']",
                         "div[aria-label='Post'][role='button']",
-                        "div[aria-label='Share'][role='button']",
-                        "button[data-testid='react-composer-post-button']",
                     ]:
                         try:
-                            el = page.wait_for_selector(sel, timeout=4000)
+                            el = page.wait_for_selector(sel, timeout=3000)
                             if el and el.is_visible() and el.is_enabled():
                                 el.click()
                                 posted = True
+                                logger.info(f"Clicked (CSS): {sel}")
                                 break
                         except Exception:
                             continue
 
                 if not posted:
                     page.screenshot(path=str(debug_dir / "fb_error_no_post_btn.png"))
-                    raise RuntimeError("Could not find the Post submit button.")
+                    raise RuntimeError("Could not find the Publish button.")
 
                 time.sleep(4)
                 logger.info("Facebook post published!")

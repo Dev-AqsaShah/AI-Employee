@@ -1,0 +1,208 @@
+"""
+instagram_scheduler.py — Autonomous Instagram Post Scheduler
+
+Runs daily. On posting days, uses Claude API to draft an Instagram
+caption and saves to /Pending_Approval/ for human review.
+
+Posting days: Tuesday, Thursday, Saturday (by default)
+Instagram style: 2200 char limit, hashtags recommended, emojis OK
+
+Usage:
+    python schedulers/instagram_scheduler.py           # Run for today
+    python schedulers/instagram_scheduler.py --force   # Force draft
+    python schedulers/instagram_scheduler.py --dry-run # Preview only
+"""
+
+import os
+import re
+import sys
+import logging
+import argparse
+from pathlib import Path
+from datetime import datetime, timezone
+
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
+try:
+    import anthropic
+    ANTHROPIC_AVAILABLE = True
+except ImportError:
+    ANTHROPIC_AVAILABLE = False
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [InstagramScheduler] %(levelname)s: %(message)s",
+)
+logger = logging.getLogger("InstagramScheduler")
+
+VAULT_PATH        = Path(os.getenv("VAULT_PATH", "AI_Employee_Vault"))
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+PENDING_DIR       = VAULT_PATH / "Pending_Approval"
+LOGS_DIR          = VAULT_PATH / "Logs"
+GOALS_FILE        = VAULT_PATH / "Business_Goals.md"
+DONE_DIR          = VAULT_PATH / "Done"
+
+POSTING_DAYS_DEFAULT = ["Tuesday", "Thursday", "Saturday"]
+
+
+def read_content_strategy() -> dict:
+    if not GOALS_FILE.exists():
+        return {}
+    content = GOALS_FILE.read_text(encoding="utf-8")
+    days_match = re.search(r"instagram_posting_days:\s*(.+)", content)
+    posting_days = [d.strip() for d in days_match.group(1).split(",")] if days_match else POSTING_DAYS_DEFAULT
+    topics = re.findall(r"^\d+\.\s+(.+)$", content, re.MULTILINE)
+    tagline_match = re.search(r"Business Tagline.*?\n\"(.+?)\"", content, re.DOTALL)
+    tagline = tagline_match.group(1).strip() if tagline_match else ""
+    return {"posting_days": posting_days, "topics": topics, "tagline": tagline}
+
+
+def is_posting_day(posting_days: list) -> bool:
+    return datetime.now().strftime("%A") in posting_days
+
+
+def already_drafted_today() -> bool:
+    today = datetime.now().strftime("%Y-%m-%d")
+    for folder in [PENDING_DIR, VAULT_PATH / "Approved", DONE_DIR]:
+        if folder.exists():
+            for f in folder.glob(f"INSTAGRAM_{today}*.md"):
+                return True
+    return False
+
+
+def pick_topic(topics: list) -> str:
+    if not topics:
+        return "AI tools transforming business productivity"
+    day_of_year = datetime.now().timetuple().tm_yday
+    return topics[day_of_year % len(topics)]
+
+
+def generate_post(strategy: dict, topic: str) -> str:
+    if not ANTHROPIC_AVAILABLE or not ANTHROPIC_API_KEY:
+        logger.error("ANTHROPIC_API_KEY not set or anthropic not installed")
+        return ""
+
+    client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+    tagline = strategy.get("tagline", "")
+
+    prompt = f"""Write an Instagram caption about: {topic}
+
+Business tagline: {tagline}
+
+Instagram caption requirements:
+- Max 2200 characters (aim for 150-300 for best engagement)
+- Start with a strong hook (first line is what people see before 'more')
+- 3-5 relevant hashtags at the end
+- Emojis are encouraged (2-4 per post)
+- Conversational and authentic tone
+- End with a question or call to action
+- Focus on value, insight, or inspiration
+
+Return ONLY the caption text with hashtags, nothing else."""
+
+    logger.info(f"Generating Instagram post about: {topic}")
+    response = client.messages.create(
+        model="claude-opus-4-6",
+        max_tokens=512,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    return response.content[0].text.strip()
+
+
+def save_to_pending(post_content: str, topic: str, dry_run: bool = False) -> Path:
+    today    = datetime.now().strftime("%Y-%m-%d")
+    filename = f"INSTAGRAM_{today}.md"
+    filepath = PENDING_DIR / filename
+
+    content = f"""---
+type: instagram_post
+topic: {topic}
+drafted: {datetime.now(timezone.utc).isoformat()}
+status: pending_approval
+char_count: {len(post_content)}
+---
+
+# Instagram Post — {today}
+
+> **Topic:** {topic}
+> **Drafted by:** AI Employee (Instagram Scheduler)
+> **Char count:** {len(post_content)} / 2200
+
+---
+
+## Post Content
+
+{post_content}
+
+---
+
+## Instructions
+- **APPROVE:** Move this file to `/Approved/` — Instagram Watcher will auto-post it
+- **EDIT:** Edit the Post Content above, then move to `/Approved/`
+- **REJECT:** Move this file to `/Rejected/`
+"""
+
+    if dry_run:
+        logger.info(f"[DRY RUN] Would save: {filename}")
+        logger.info(f"[DRY RUN] Preview:\n{post_content[:200]}...")
+        return filepath
+
+    PENDING_DIR.mkdir(parents=True, exist_ok=True)
+    filepath.write_text(content, encoding="utf-8")
+    logger.info(f"Saved to Pending_Approval: {filename}")
+    return filepath
+
+
+def log_action(action: str, details: str):
+    today = datetime.now().strftime("%Y-%m-%d")
+    LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    entry = f"[{datetime.now(timezone.utc).isoformat()}] [InstagramScheduler] {action}: {details}\n"
+    with open(LOGS_DIR / f"{today}.log", "a", encoding="utf-8") as f:
+        f.write(entry)
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Instagram Post Scheduler")
+    parser.add_argument("--force",   action="store_true")
+    parser.add_argument("--dry-run", action="store_true")
+    args = parser.parse_args()
+
+    today_name = datetime.now().strftime("%A")
+    logger.info(f"Instagram Scheduler running — today is {today_name}")
+
+    strategy = read_content_strategy()
+    posting_days = strategy.get("posting_days", POSTING_DAYS_DEFAULT)
+
+    if not args.force and not is_posting_day(posting_days):
+        logger.info(f"Today ({today_name}) is not a posting day — skipping")
+        return
+
+    if not args.force and already_drafted_today():
+        logger.info("Instagram post already drafted today — skipping")
+        return
+
+    topics = strategy.get("topics", [])
+    topic  = pick_topic(topics)
+    logger.info(f"Selected topic: {topic}")
+
+    post_content = generate_post(strategy, topic)
+    if not post_content:
+        logger.error("Failed to generate post — check ANTHROPIC_API_KEY")
+        log_action("ERROR", "Failed to generate post")
+        return
+
+    filepath = save_to_pending(post_content, topic, dry_run=args.dry_run)
+
+    if not args.dry_run:
+        log_action("POST_DRAFTED", f"topic={topic} file={filepath.name}")
+        logger.info(f"Done! Review: Pending_Approval/{filepath.name}")
+    else:
+        logger.info("[DRY RUN] Complete")
+
+
+if __name__ == "__main__":
+    main()

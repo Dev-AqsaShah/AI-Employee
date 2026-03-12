@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Approved/FACEBOOK_2026-03-10.md",
+                "file": "Done/APPROVAL_EMAIL_Google_2FA_20260228.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "FACEBOOK_2026-03-10"
+              "title": "APPROVAL_EMAIL_Google_2FA_20260228"
             }
           }
         ]
@@ -94,7 +94,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "Approved/FACEBOOK_2026-03-10.md",
+                "file": "Done/APPROVAL_EMAIL_Google_2FA_20260228.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -104,7 +104,7 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "Backlinks for FACEBOOK_2026-03-10"
+              "title": "Backlinks for APPROVAL_EMAIL_Google_2FA_20260228"
             }
           },
           {
@@ -113,12 +113,12 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "Approved/FACEBOOK_2026-03-10.md",
+                "file": "Done/APPROVAL_EMAIL_Google_2FA_20260228.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
               "icon": "links-going-out",
-              "title": "Outgoing links from FACEBOOK_2026-03-10"
+              "title": "Outgoing links from APPROVAL_EMAIL_Google_2FA_20260228"
             }
           },
           {
@@ -156,13 +156,13 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "Approved/FACEBOOK_2026-03-10.md",
+                "file": "Done/APPROVAL_EMAIL_Google_2FA_20260228.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "Outline of FACEBOOK_2026-03-10"
+              "title": "Outline of APPROVAL_EMAIL_Google_2FA_20260228"
             }
           }
         ]
@@ -183,11 +183,17 @@
       "bases:Create new base": false
     }
   },
-  "active": "20b10e37dcb9f00e",
+  "active": "e02a9e565658ebc5",
   "lastOpenFiles": [
+    "Logs/2026-03-12.log",
+    "Done/FACEBOOK_2026-03-11.md",
+    "Approved/FACEBOOK_2026-03-10.md",
+    "Approved/FACEBOOK_2026-03-11.md",
+    "Done/TEST_CHAIN_2026-03-11.md",
+    "Done/FACEBOOK_2026-03-10.md",
+    "Logs/2026-03-11.log",
     "Done/APPROVAL_EMAIL_Google_2FA_20260228.md",
     "Logs/2026-03-10.log",
-    "Approved/FACEBOOK_2026-03-10.md",
     "Done/DRAFT_EMAIL_test_20260228.md",
     "Done/EMAIL_20260227_194726_19c9f8c428f5.md",
     "Done/APPROVAL_EMAIL_Binance_Promo_20260228.md",
@@ -214,11 +220,6 @@
     "Done/EMAIL_20260228_141506_19ca385e934a.md",
     "Done/EMAIL_20260228_141321_19ca385e934a.md",
     "Done/EMAIL_20260227_194937_19c36b0ab710.md",
-    "Done/EMAIL_20260227_194938_19c34422ee1b.md",
-    "Done/EMAIL_20260227_194937_19c426a289bc.md",
-    "Done/EMAIL_20260227_194937_19c48257550c.md",
-    "Done/EMAIL_20260227_194936_19c506ffd8c6.md",
-    "Logs/2026-02-28.log",
-    "Dashboard.md.tmp.14267.1772209293360"
+    "Logs/2026-02-28.log"
   ]
 }

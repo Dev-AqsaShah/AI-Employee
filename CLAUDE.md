@@ -1,6 +1,6 @@
 # AI Employee — CLAUDE.md
 
-This is the Claude Code configuration file for the Personal AI Employee project (Bronze Tier).
+This is the Claude Code configuration file for the **Personal AI Employee (Gold Tier)**.
 
 ## Vault Location
 
@@ -13,7 +13,7 @@ When reading or writing files, always use paths relative to this repository root
 AI_Employee_Vault/
 ├── Dashboard.md          ← Real-time status overview (update after every action)
 ├── Company_Handbook.md   ← Rules of engagement — READ THIS FIRST
-├── Business_Goals.md     ← Q1 objectives and metrics
+├── Business_Goals.md     ← Q1 objectives, metrics, and social media strategy
 ├── Inbox/                ← Files waiting to be triaged
 ├── Needs_Action/         ← Items requiring processing (Claude's primary queue)
 ├── Pending_Approval/     ← Actions awaiting human approval
@@ -30,40 +30,137 @@ AI_Employee_Vault/
 1. **Always read Company_Handbook.md before taking any action.**
 2. **Update Dashboard.md after every significant action.**
 3. **Log every action to Logs/YYYY-MM-DD.log.**
-4. **Never perform external actions (send email, make payment) without a file in /Approved/.**
+4. **Never perform external actions (send email, post to social media) without a file in /Approved/.**
 5. **Check for STOP.md in vault root — if it exists, halt all autonomous actions.**
+6. **All social media posts require human approval before publishing.**
 
-## Available Skills
+## Available Agent Skills
 
 Use these slash commands inside Claude Code:
 
-| Command              | Description                                   |
-|----------------------|-----------------------------------------------|
-| `/process-inbox`     | Process all pending Needs_Action items        |
-| `/daily-briefing`    | Generate today's CEO briefing                 |
-| `/move-to-done`      | Mark a specific item as complete              |
-| `/vault-status`      | Quick snapshot of all vault folder counts     |
+### Core Skills
 
-## Watchers
+| Command              | Description                                        |
+|----------------------|----------------------------------------------------|
+| `/process-inbox`     | Process all pending Needs_Action items             |
+| `/daily-briefing`    | Generate today's status briefing                   |
+| `/vault-status`      | Quick snapshot of all vault folder counts          |
+| `/move-to-done`      | Mark a specific item as complete                   |
+| `/review-approvals`  | List all items awaiting human approval             |
 
-Run the filesystem watcher to monitor a drop folder:
+### Planning & Execution
+
+| Command              | Description                                        |
+|----------------------|----------------------------------------------------|
+| `/create-plan`       | Reason through a task and write a Plan.md          |
+| `/execute-plan`      | Work through a Plan.md step by step                |
+| `/schedule-briefing` | Set up cron/Task Scheduler for daily automation    |
+
+### Social Media (Gold Tier)
+
+| Command              | Description                                        |
+|----------------------|----------------------------------------------------|
+| `/linkedin-post`     | Draft a LinkedIn post (→ Pending_Approval)         |
+| `/facebook-post`     | Draft a Facebook post (→ Pending_Approval)         |
+| `/instagram-post`    | Draft an Instagram caption (→ Pending_Approval)    |
+| `/twitter-post`      | Draft a tweet / 280 chars (→ Pending_Approval)     |
+
+### Accounting & Reporting (Gold Tier)
+
+| Command              | Description                                        |
+|----------------------|----------------------------------------------------|
+| `/ceo-briefing`      | Generate weekly CEO business audit report          |
+| `/odoo-invoice`      | Create/list invoices via Odoo ERP                  |
+
+### Autonomy (Gold Tier)
+
+| Command              | Description                                        |
+|----------------------|----------------------------------------------------|
+| `/ralph-status`      | Check Ralph Wiggum Loop status / reset / stop      |
+| `/gmail-watcher`     | Set up and check the Gmail watcher                 |
+
+## Human-in-the-Loop Workflow
+
+```
+AI drafts post → Pending_Approval/<PLATFORM>_<date>.md
+      ↓
+You review in Obsidian
+      ↓
+Move to Approved/        ← drag & drop in Obsidian
+      ↓
+Watcher detects → auto-posts
+      ↓
+Moved to Done/
+```
+
+## Social Media Schedule
+
+| Platform   | Default Posting Days       | Char Limit |
+|------------|---------------------------|------------|
+| LinkedIn   | Monday, Wednesday, Friday  | 1,300      |
+| Facebook   | Tuesday, Thursday, Saturday| 500        |
+| Instagram  | Tuesday, Thursday, Saturday| 2,200      |
+| Twitter/X  | Monday, Wednesday, Friday  | 280        |
+
+Customize in `Business_Goals.md`:
+```
+posting_days: Monday, Wednesday, Friday
+instagram_posting_days: Tuesday, Thursday, Saturday
+twitter_posting_days: Monday, Wednesday, Friday
+```
+
+## Watchers (run via Orchestrator)
+
+Start everything with one command:
+```bash
+python orchestrator.py
+```
+
+Individual watchers:
+```bash
+python watchers/filesystem_watcher.py   # Monitor drop folder
+python watchers/gmail_watcher.py        # Monitor Gmail
+python watchers/linkedin_watcher.py     # Auto-post LinkedIn
+python watchers/facebook_watcher.py     # Auto-post Facebook
+python watchers/instagram_watcher.py    # Auto-post Instagram
+python watchers/twitter_watcher.py      # Auto-post Twitter/X
+python watchers/email_watcher.py        # Send emails via SMTP
+python watchers/ralph_watcher.py        # Task chain daemon
+```
+
+## Session Setup (one-time per social platform)
 
 ```bash
-# Install dependencies first
-pip install -r requirements.txt
+python watchers/facebook_watcher.py --setup
+python watchers/instagram_watcher.py --setup
+python watchers/twitter_watcher.py --setup
+```
 
-# Start the watcher (drop files into drop_folder/ to trigger)
-python watchers/filesystem_watcher.py
+## Emergency Stop
 
-# Dry run (no files written)
-python watchers/filesystem_watcher.py --dry-run
+```bash
+# Create STOP.md to halt all autonomous actions
+echo "STOP" > AI_Employee_Vault/STOP.md
 
-# Custom paths
-python watchers/filesystem_watcher.py --vault /path/to/vault --drop /path/to/drop
+# Or use the skill:
+# /ralph-status stop
+```
+
+## Odoo ERP (Gold Tier)
+
+```bash
+# Start Odoo + PostgreSQL
+docker compose up -d
+
+# Test MCP connection
+python mcp_server/odoo_mcp.py --test
+
+# Open dashboard: http://localhost:8069
 ```
 
 ## Security
 
 - Never commit `.env` — it is in `.gitignore`
 - All credentials go in `.env` only
-- See `.env.example` for the required variables
+- Sessions stored in `credentials/` (also gitignored)
+- Human approval required for all external actions

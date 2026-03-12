@@ -10,5 +10,18 @@
       "args": ["mcp_server/odoo_mcp.py"],
       "env": {}
     }
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python scripts/ralph_check.py"
+          }
+        ]
+      }
+    ]
   }
 }
