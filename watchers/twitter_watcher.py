@@ -61,15 +61,29 @@ TWITTER_CHAR_LIMIT = 280
 
 
 def extract_post_content(filepath: Path) -> str:
-    content = filepath.read_text(encoding="utf-8")
-    content = re.sub(r"^---.*?---\s*", "", content, flags=re.DOTALL)
-    content = re.sub(r"^#{1,6}\s+.*$", "", content, flags=re.MULTILINE)
-    content = re.sub(
-        r"^.*(?:Pending_Approval|Approved|Rejected|Move this|approval|APPROVE|EDIT|REJECT|Instructions|Drafted by).*$",
-        "", content, flags=re.MULTILINE | re.IGNORECASE
+    """Extract only the tweet text under '## Tweet Content' section."""
+    raw = filepath.read_text(encoding="utf-8")
+
+    # Extract only what's between ## Tweet Content and the next ---
+    match = re.search(
+        r"##\s+Tweet Content\s*\n(.*?)(?:\n---|\Z)",
+        raw,
+        flags=re.DOTALL | re.IGNORECASE,
     )
-    content = re.sub(r"\n{3,}", "\n\n", content).strip()
-    # Twitter/X limit: 280 chars
+    if match:
+        content = match.group(1).strip()
+    else:
+        # Fallback: strip frontmatter + headings + blockquotes + hr lines
+        content = re.sub(r"^---.*?---\s*", "", raw, flags=re.DOTALL)
+        content = re.sub(r"^#{1,6}\s+.*$", "", content, flags=re.MULTILINE)
+        content = re.sub(r"^>.*$", "", content, flags=re.MULTILINE)
+        content = re.sub(r"^-{3,}$", "", content, flags=re.MULTILINE)
+        content = re.sub(
+            r"^.*(?:Pending_Approval|Approved|Rejected|Move this|approval|APPROVE|EDIT|REJECT|Instructions|Drafted by|Char count|Topic:).*$",
+            "", content, flags=re.MULTILINE | re.IGNORECASE,
+        )
+        content = re.sub(r"\n{3,}", "\n\n", content).strip()
+
     if len(content) > TWITTER_CHAR_LIMIT:
         content = content[:TWITTER_CHAR_LIMIT - 3] + "..."
     return content
@@ -101,12 +115,36 @@ class TwitterPoster:
         print("="*50 + "\n")
 
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=False, args=["--no-sandbox"])
-            context = browser.new_context(viewport={"width": 1280, "height": 800})
+            browser = p.chromium.launch(
+                headless=False,
+                args=[
+                    "--no-sandbox",
+                    "--start-maximized",
+                    "--disable-blink-features=AutomationControlled",
+                    "--disable-infobars",
+                    "--disable-dev-shm-usage",
+                ],
+            )
+            context = browser.new_context(
+                viewport={"width": 1280, "height": 800},
+                user_agent=(
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/122.0.0.0 Safari/537.36"
+                ),
+                locale="en-US",
+                timezone_id="Asia/Karachi",
+            )
+            # Hide webdriver flag so Twitter doesn't detect Playwright
+            context.add_init_script(
+                "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
+            )
             page = context.new_page()
-            page.goto("https://x.com/login", wait_until="commit", timeout=60000)
+            page.goto("https://x.com/login", wait_until="domcontentloaded", timeout=60000)
+            time.sleep(3)
             print("X (Twitter) login karo...")
-            input("\nLogin complete hone ke baad yahan Enter dabaо: ")
+            print("NOTE: Username type karo → Next dabao → Password type karo → Login karo")
+            input("\nLogin COMPLETE hone ke baad (home page dikhe) yahan Enter dabao: ")
             context.storage_state(path=str(session_file))
             browser.close()
 
@@ -132,60 +170,77 @@ class TwitterPoster:
         try:
             with sync_playwright() as p:
                 browser = p.chromium.launch(
-                    headless=True,
-                    args=["--no-sandbox", "--disable-dev-shm-usage"],
+                    headless=False,
+                    args=[
+                        "--no-sandbox",
+                        "--disable-dev-shm-usage",
+                        "--disable-blink-features=AutomationControlled",
+                        "--disable-infobars",
+                        "--start-maximized",
+                    ],
                 )
                 context = browser.new_context(
                     storage_state=str(session_file),
                     viewport={"width": 1280, "height": 800},
+                    user_agent=(
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                        "AppleWebKit/537.36 (KHTML, like Gecko) "
+                        "Chrome/122.0.0.0 Safari/537.36"
+                    ),
+                    locale="en-US",
+                    timezone_id="Asia/Karachi",
+                )
+                context.add_init_script(
+                    "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
                 )
                 page = context.new_page()
 
                 logger.info("Opening X (Twitter)...")
-                page.goto("https://x.com/home", wait_until="commit", timeout=60000)
-                time.sleep(4)
+                page.goto("https://x.com/home", wait_until="domcontentloaded", timeout=60000)
+
+                # Wait for page to fully load — sidebar nav is a reliable signal
+                try:
+                    page.wait_for_selector("[data-testid='SideNav_NewTweet_Button']", timeout=20000)
+                    logger.info("Home page loaded.")
+                except Exception:
+                    pass
+                time.sleep(3)
 
                 if "login" in page.url or "signin" in page.url:
                     browser.close()
                     return {"status": "error", "message": "Session expired. Run --setup again"}
 
                 page.screenshot(path=str(debug_dir / "tw_1_home.png"))
-                logger.info("Logged in. Finding tweet composer...")
+                logger.info("Logged in. Opening tweet composer...")
 
-                # Find compose tweet area
+                # Step 1: Click the sidebar "Post" / compose button to open composer
+                try:
+                    btn = page.wait_for_selector("[data-testid='SideNav_NewTweet_Button']", timeout=8000)
+                    if btn and btn.is_visible():
+                        btn.click()
+                        logger.info("Clicked sidebar compose button.")
+                        time.sleep(2)
+                except Exception:
+                    pass
+
+                # Step 2: Find the text editor inside the composer
                 editor = None
                 for sel in [
                     "[data-testid='tweetTextarea_0']",
                     "div[aria-label='Post text'][contenteditable='true']",
-                    "div[data-offset-key][contenteditable='true']",
                     "div[role='textbox'][contenteditable='true']",
                     "div[aria-placeholder='What is happening?!']",
+                    "div[data-offset-key][contenteditable='true']",
                     "div[contenteditable='true']",
                 ]:
                     try:
-                        el = page.wait_for_selector(sel, timeout=5000)
+                        el = page.wait_for_selector(sel, timeout=6000)
                         if el and el.is_visible():
                             editor = el
                             logger.info(f"Found composer: {sel}")
                             break
                     except Exception:
                         continue
-
-                if not editor:
-                    # Try clicking "What is happening?!" placeholder
-                    try:
-                        page.get_by_placeholder("What is happening?!").click(timeout=4000)
-                        time.sleep(2)
-                        for sel in ["div[data-testid='tweetTextarea_0']", "div[contenteditable='true']"]:
-                            try:
-                                editor = page.wait_for_selector(sel, timeout=3000)
-                                if editor and editor.is_visible():
-                                    break
-                                editor = None
-                            except Exception:
-                                continue
-                    except Exception:
-                        pass
 
                 if not editor:
                     page.screenshot(path=str(debug_dir / "tw_error_no_composer.png"))

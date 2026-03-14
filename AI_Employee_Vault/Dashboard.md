@@ -16,6 +16,10 @@ version: 0.1
 ## Recent Activity
 
 | Time (UTC)          | Action                                      |
+| 2026-03-14 15:50:00 | Instagram draft queued: INSTAGRAM_2026-03-14.md (312 chars) |
+| 2026-03-14 15:39:39 | Twitter post success: TWITTER_2026-03-14.md |
+| 2026-03-14 15:11:01 | Twitter post success: TWITTER_2026-03-14.md |
+| 2026-03-14 14:50:00 | Twitter draft queued: TWITTER_2026-03-14.md (259/280 chars) |
 | 2026-03-11 14:52:46 | Facebook post success: FACEBOOK_2026-03-11.md |
 | 2026-03-11 11:21:14 | Facebook post success: FACEBOOK_2026-03-10.md |
 | 2026-02-28 21:19:54 | Email success: DRAFT_EMAIL_test_20260228.md |
