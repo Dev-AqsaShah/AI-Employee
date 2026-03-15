@@ -322,6 +322,14 @@ class Orchestrator:
             enabled=bool(tw_user),
         ))
 
+        # WhatsApp watcher — enabled if session exists
+        wa_session = Path("credentials/whatsapp_session/browser_data")
+        processes.append(ManagedProcess(
+            name="whatsapp-watcher",
+            cmd=[python, "watchers/whatsapp_watcher.py"],
+            enabled=wa_session.exists(),
+        ))
+
         # Ralph watcher — always enabled (task chain daemon)
         processes.append(ManagedProcess(
             name="ralph-watcher",

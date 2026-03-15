@@ -15,8 +15,8 @@ Google sent a security notification that **2-Step Verification was turned on** f
 Security account changes always require owner awareness per Company Handbook §6.
 
 ## Action Required
-- [ ] **Confirm:** Did you intentionally turn on 2-Step Verification?
-- [ ] If YES → Move this file to `/Done/` — no further action needed
+- [x] **Confirm:** Did you intentionally turn on 2-Step Verification?
+- [x] If YES → Move this file to `/Done/` — no further action needed
 - [ ] If NO (unauthorized change) → Immediately secure your Google account
 
 ## Original Email Details

@@ -160,12 +160,34 @@ class InstagramPoster:
         print("="*50 + "\n")
 
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=False, args=["--no-sandbox"])
-            context = browser.new_context(viewport={"width": 375, "height": 812})
+            browser = p.chromium.launch(
+                headless=False,
+                args=[
+                    "--no-sandbox",
+                    "--start-maximized",
+                    "--disable-blink-features=AutomationControlled",
+                    "--disable-infobars",
+                ],
+            )
+            context = browser.new_context(
+                viewport={"width": 1280, "height": 900},
+                user_agent=(
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/122.0.0.0 Safari/537.36"
+                ),
+                locale="en-US",
+                timezone_id="Asia/Karachi",
+            )
+            context.add_init_script(
+                "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
+            )
             page = context.new_page()
-            page.goto("https://www.instagram.com/accounts/login/", wait_until="commit", timeout=60000)
+            page.goto("https://www.instagram.com/accounts/login/", wait_until="domcontentloaded", timeout=60000)
+            time.sleep(3)
             print("Instagram login karo... (2FA bhi complete karo agar aaye)")
-            input("\nLogin complete hone ke baad yahan Enter dabaо: ")
+            print("NOTE: Home feed dikhne ke baad hi Enter dabao!")
+            input("\nLogin COMPLETE hone ke baad yahan Enter dabao: ")
             context.storage_state(path=str(session_file))
             browser.close()
 
@@ -229,9 +251,16 @@ class InstagramPoster:
                     pass
                 time.sleep(3)
 
-                if "login" in page.url:
+                # Check if logged in — look for home feed nav element
+                is_logged_out = "login" in page.url or "accounts" in page.url
+                if not is_logged_out:
+                    try:
+                        page.wait_for_selector("svg[aria-label='New post']", timeout=5000)
+                    except Exception:
+                        is_logged_out = True  # nav not found = probably login page
+                if is_logged_out:
                     browser.close()
-                    return {"status": "error", "message": "Session expired. Run --setup again"}
+                    return {"status": "error", "message": "Session expired. Run: python watchers/instagram_watcher.py --setup"}
 
                 page.screenshot(path=str(debug_dir / "ig_1_home.png"))
 
@@ -342,24 +371,43 @@ class InstagramPoster:
                 time.sleep(2)
                 page.screenshot(path=str(debug_dir / "ig_5_typed.png"))
 
-                # Click Share button
+                # Click Share — it's a link not a button on Instagram web
                 posted = False
-                for btn_name in ["Share", "Post", "Publish"]:
+                # Try link first (Instagram uses <a> for Share)
+                for sel in [
+                    "a:has-text('Share')",
+                    "[role='link']:has-text('Share')",
+                ]:
                     try:
-                        btn = page.get_by_role("button", name=btn_name)
-                        if btn.is_visible(timeout=3000) and btn.is_enabled():
-                            btn.click()
+                        el = page.wait_for_selector(sel, timeout=3000)
+                        if el and el.is_visible():
+                            el.click()
                             posted = True
-                            logger.info(f"Clicked: '{btn_name}'")
+                            logger.info(f"Clicked Share link: {sel}")
                             break
                     except Exception:
                         continue
+
+                # Fallback: button
+                if not posted:
+                    for btn_name in ["Share", "Post", "Publish"]:
+                        try:
+                            btn = page.get_by_role("button", name=btn_name)
+                            if btn.is_visible(timeout=3000) and btn.is_enabled():
+                                btn.click()
+                                posted = True
+                                logger.info(f"Clicked: '{btn_name}'")
+                                break
+                        except Exception:
+                            continue
 
                 if not posted:
                     page.screenshot(path=str(debug_dir / "ig_error_no_share.png"))
                     raise RuntimeError("Could not find Share button. Check ig_5_typed.png")
 
-                time.sleep(5)
+                # Wait for post confirmation screen
+                time.sleep(8)
+                page.screenshot(path=str(debug_dir / "ig_6_after_share.png"))
                 logger.info("Instagram post published!")
                 self._log("POST_SUCCESS", f"chars={len(content)}")
                 browser.close()

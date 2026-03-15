@@ -20,6 +20,7 @@ A fully autonomous AI Employee powered by **Claude Code** + **Obsidian** that ma
 │  ├── twitter_watcher.py   — posts to Twitter/X       │
 │  ├── email_watcher.py     — sends emails via SMTP    │
 │  ├── filesystem_watcher.py— monitors drop folder     │
+│  ├── whatsapp_watcher.py  — monitors & sends WhatsApp│
 │  └── ralph_watcher.py     — autonomous task chains   │
 │                                                      │
 │  REASONING (Claude Code)                             │
@@ -53,6 +54,7 @@ A fully autonomous AI Employee powered by **Claude Code** + **Obsidian** that ma
 | Facebook auto-posting | ✅ |
 | Instagram auto-posting | ✅ |
 | Twitter/X auto-posting | ✅ |
+| WhatsApp monitor + auto-reply | ✅ |
 | Email MCP server | ✅ |
 | Odoo accounting MCP | ✅ |
 | CEO Weekly Briefing | ✅ |
@@ -90,6 +92,9 @@ python watchers/instagram_watcher.py --setup
 
 # Twitter/X
 python watchers/twitter_watcher.py --setup
+
+# WhatsApp (scan QR code)
+python watchers/whatsapp_watcher.py --setup
 ```
 
 ### 4. Start the orchestrator
@@ -155,6 +160,34 @@ posting_days: Monday, Wednesday, Friday
 instagram_posting_days: Tuesday, Thursday, Saturday
 twitter_posting_days: Monday, Wednesday, Friday
 ```
+
+---
+
+## WhatsApp Watcher
+
+Monitors incoming personal WhatsApp messages and sends AI-drafted replies with human approval.
+
+```bash
+# One-time setup (scan QR code in browser)
+python watchers/whatsapp_watcher.py --setup
+
+# Check new messages → saved to Inbox/ + AI reply drafted in Pending_Approval/
+python watchers/whatsapp_watcher.py --check-now
+
+# Send approved replies from Approved/
+python watchers/whatsapp_watcher.py --send-now
+
+# Full watch loop (monitor + send)
+python watchers/whatsapp_watcher.py
+```
+
+**Flow:**
+1. New message detected → `Inbox/WHATSAPP_*.md` saved
+2. Claude API auto-drafts reply → `Pending_Approval/WHATSAPP_REPLY_*.md`
+3. You review & approve → move to `Approved/`
+4. Watcher sends it → moved to `Done/`
+
+**Note:** Groups are automatically skipped — only personal messages are processed.
 
 ---
 

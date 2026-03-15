@@ -2,7 +2,7 @@
 type: instagram_post
 topic: AI automation for small businesses in Pakistan
 drafted: 2026-03-14T15:50:00+00:00
-status: pending_approval
+status: posted
 char_count: 312
 ---
 
@@ -31,3 +31,11 @@ Are you still doing everything manually?
 - **APPROVE:** Move to `/Approved/` — Instagram Watcher will auto-post it
 - **EDIT:** Edit the Post Content above, then move to `/Approved/`
 - **REJECT:** Move to `/Rejected/`
+
+
+## Posted [2026-03-14T12:00:09.596835+00:00]
+- **Result:** Post published on Instagram
+
+
+## Posted [2026-03-14T12:18:19.697869+00:00]
+- **Result:** Post published on Instagram

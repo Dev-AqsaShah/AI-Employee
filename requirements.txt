@@ -1,21 +1,28 @@
 # AI Employee — Python dependencies
-# Install with: uv pip install -r requirements.txt
+# Install with: pip install -r requirements.txt
+# Then: playwright install chromium
 
-# ── Bronze Tier (core) ─────────────────────────────────────────────────────────
+# ── Core ───────────────────────────────────────────────────────────────────────
 watchdog>=4.0.0
 python-dotenv>=1.0.0
 
-# ── Silver Tier — Gmail Watcher ────────────────────────────────────────────────
+# ── Claude API (auto-drafting, CEO briefing, WhatsApp replies) ─────────────────
+anthropic>=0.40.0
+
+# ── Browser Automation (Social Media + WhatsApp) ───────────────────────────────
+playwright>=1.40.0
+# After installing: playwright install chromium
+
+# ── Gmail Watcher ──────────────────────────────────────────────────────────────
 google-auth>=2.0.0
 google-auth-oauthlib>=1.0.0
 google-api-python-client>=2.0.0
 
-# ── Silver Tier — Email MCP Server ────────────────────────────────────────────
+# ── Email MCP Server ───────────────────────────────────────────────────────────
 mcp>=1.0.0
 
-# ── Silver Tier — WhatsApp / Browser Automation ───────────────────────────────
-# playwright>=1.40.0
-# After installing: playwright install chromium
+# ── Instagram Image Generation ─────────────────────────────────────────────────
+Pillow>=10.0.0
 
-# ── Gold Tier (future) ─────────────────────────────────────────────────────────
-# requests>=2.31.0   (for LinkedIn API, Banking APIs)
+# ── Odoo ERP (optional — requires docker compose up -d) ───────────────────────
+# xmlrpc is built-in to Python, no extra install needed

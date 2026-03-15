@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Done/APPROVAL_EMAIL_Google_2FA_20260228.md",
+                "file": "Pending_Approval/WHATSAPP_REPLY_2026-03-14_GIAIC_03_AI_Spec-Driven_Online_Hackathon.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "APPROVAL_EMAIL_Google_2FA_20260228"
+              "title": "WHATSAPP_REPLY_2026-03-14_GIAIC_03_AI_Spec-Driven_Online_Hackathon"
             }
           }
         ]
@@ -183,9 +183,26 @@
       "bases:Create new base": false
     }
   },
-  "active": "e02a9e565658ebc5",
+  "active": "20b10e37dcb9f00e",
   "lastOpenFiles": [
-    "Pending_Approval/INSTAGRAM_2026-03-14.md",
+    "Approved/WHATSAPP_REPLY_2026-03-14_Musfirah.md",
+    "Done/WHATSAPP_REPLY_2026-03-14_Musfirah.md",
+    "Approved/sedgWiacB",
+    "Pending_Approval/WHATSAPP_REPLY_2026-03-14_GIAIC_03_AI_Spec-Driven_Online_Hackathon.md",
+    "Approved/WHATSAPP_REPLY_2026-03-14_Mine 1.md",
+    "Done/WHATSAPP_REPLY_2026-03-14_Mine.md",
+    "Done/WHATSAPP_REPLY_2026-03-14_Mine 1.md",
+    "Done/APPROVAL_EMAIL_Google_2FA_20260228.md",
+    "Inbox/WHATSAPP_20260314_225943_GIAIC_03_AI_Spec-Driven_Online_Hackathon.md",
+    "Inbox/WHATSAPP_20260314_225941_Mine.md",
+    "Inbox/WHATSAPP_20260314_224050_GIAIC_03_AI_Spec-Driven_Online_Hackathon.md",
+    "Approved/WHATSAPP_REPLY_2026-03-14_Mine.md",
+    "Inbox/WHATSAPP_20260314_224050_Mine.md",
+    "Inbox/WHATSAPP_20260314_222508_B__S_Computer_science_girls_group.md",
+    "Inbox/WHATSAPP_20260314_222508_Mine.md",
+    "Inbox/WHATSAPP_20260314_222508_GIAIC_03_AI_Spec-Driven_Online_Hackathon.md",
+    "Approved/INSTAGRAM_2026-03-14.md",
+    "Done/INSTAGRAM_2026-03-14.md",
     "Approved/TWITTER_2026-03-14.md",
     "Done/TWITTER_2026-03-14.md",
     "Logs/2026-03-12.log",
@@ -195,31 +212,14 @@
     "Done/TEST_CHAIN_2026-03-11.md",
     "Done/FACEBOOK_2026-03-10.md",
     "Logs/2026-03-11.log",
-    "Done/APPROVAL_EMAIL_Google_2FA_20260228.md",
     "Logs/2026-03-10.log",
     "Done/DRAFT_EMAIL_test_20260228.md",
     "Done/EMAIL_20260227_194726_19c9f8c428f5.md",
-    "Done/APPROVAL_EMAIL_Binance_Promo_20260228.md",
-    "Done/FILE_20260226_220125_test_invoice.md",
-    "Needs_Action/EMAIL_20260301_194923_19ca55292c0d.md",
     "Logs/2026-03-01.log",
-    "Needs_Action/EMAIL_20260301_194608_19ca55292c0d.md",
-    "Needs_Action/EMAIL_20260228_211555_19ca507ceb86.md",
-    "Needs_Action/EMAIL_20260227_194727_19c9d5235f2d.md",
-    "Approved/DRAFT_EMAIL_test_20260228.md",
-    "Approved/APPROVAL_EMAIL_Google_2FA_20260228.md",
-    "Approved/APPROVAL_EMAIL_Binance_Promo_20260228.md",
     "Dashboard.md.tmp.14267.1772270937653",
     "Dashboard.md.tmp.14267.1772270921479",
     "Dashboard.md.tmp.14267.1772270911875",
     "Dashboard.md.tmp.14267.1772270903822",
-    "Done/EMAIL_20260227_194735_19c531695618.md",
-    "Done/EMAIL_20260227_194734_19c532a44c5f.md",
-    "Done/EMAIL_20260227_194727_19c9e0b2b25d.md",
-    "Pending_Approval/APPROVAL_EMAIL_Binance_Promo_20260228.md",
-    "Pending_Approval/APPROVAL_EMAIL_Binance_Promo_20260228.md.tmp.14267.1772270871614",
-    "Pending_Approval/APPROVAL_EMAIL_Google_2FA_20260228.md",
-    "Pending_Approval/APPROVAL_EMAIL_Google_2FA_20260228.md.tmp.14267.1772270858333",
-    "Done/EMAIL_20260228_141506_19ca385e934a.md"
+    "Pending_Approval/APPROVAL_EMAIL_Binance_Promo_20260228.md.tmp.14267.1772270871614"
   ]
 }
