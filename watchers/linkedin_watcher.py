@@ -191,19 +191,35 @@ class LinkedInPoster:
                 if not clicked:
                     raise RuntimeError("Could not find 'Start a post' button — LinkedIn may have changed their UI")
 
-                time.sleep(2)
+                time.sleep(6)
 
-                # Type the post content — try ql-editor first, then contenteditable
+                # Take screenshot to debug
+                page.screenshot(path="debug_screenshots/li_1_after_click.png")
+
+                # Type the post content — try multiple editor selectors
                 editor = None
-                for ed_sel in ["div.ql-editor", "div[contenteditable='true']", "div[role='textbox']"]:
+                for ed_sel in [
+                    "div.ql-editor",
+                    "div[role='textbox']",
+                    "div[contenteditable='true']",
+                    ".editor-content div[contenteditable]",
+                    "div[data-placeholder]",
+                    "div.share-creation-state__editor div[contenteditable='true']",
+                    ".mentions-texteditor__contenteditable",
+                    "div.editor-container div[contenteditable]",
+                    "div.share-box__container div[contenteditable='true']",
+                    "p[data-placeholder]",
+                ]:
                     try:
-                        editor = page.wait_for_selector(ed_sel, timeout=8000)
+                        editor = page.wait_for_selector(ed_sel, timeout=5000)
                         if editor:
+                            logger.info(f"Found editor with selector: {ed_sel}")
                             break
                     except Exception:
                         continue
 
                 if not editor:
+                    page.screenshot(path="debug_screenshots/li_no_editor.png")
                     raise RuntimeError("Could not find post editor — LinkedIn may have changed their UI")
 
                 editor.click()

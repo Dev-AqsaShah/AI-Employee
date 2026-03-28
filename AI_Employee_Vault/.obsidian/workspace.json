@@ -179,8 +179,11 @@
       "bases:Create new base": false
     }
   },
-  "active": "e02a9e565658ebc5",
+  "active": "2f206dff75aa7609",
   "lastOpenFiles": [
+    "Pending_Approval/LINKEDIN_2026-03-29.md",
+    "Approved/LINKEDIN_2026-03-29.md",
+    "Logs/2026-03-29.log",
     "Pending_Approval/WHATSAPP_REPLY_2026-03-28_B__S_Computer_science_girls_group.md",
     "Inbox/WHATSAPP_20260328_184925_B__S_Computer_science_girls_group.md",
     "Pending_Approval/WHATSAPP_REPLY_2026-03-28_GIAIC_03_AI_Spec-Driven_Online_Hackathon.md",
@@ -210,12 +213,9 @@
     "Inbox/WHATSAPP_20260314_225941_Mine.md",
     "Inbox/WHATSAPP_20260314_224050_GIAIC_03_AI_Spec-Driven_Online_Hackathon.md",
     "Approved/WHATSAPP_REPLY_2026-03-14_Mine.md",
-    "Inbox/WHATSAPP_20260314_224050_Mine.md",
-    "Inbox/WHATSAPP_20260314_222508_B__S_Computer_science_girls_group.md",
     "Logs/2026-03-12.log",
     "Logs/2026-03-11.log",
     "Logs/2026-03-10.log",
-    "Logs/2026-03-01.log",
-    "Dashboard.md.tmp.14267.1772270937653"
+    "Logs/2026-03-01.log"
   ]
 }
