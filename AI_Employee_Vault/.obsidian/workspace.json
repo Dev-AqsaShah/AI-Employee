@@ -4,11 +4,11 @@
     "type": "split",
     "children": [
       {
-        "id": "f1c3f1748b4e4e7a",
+        "id": "e2f6a5dd6c7f2e91",
         "type": "tabs",
         "children": [
           {
-            "id": "74f5b2ff716cb50e",
+            "id": "2f206dff75aa7609",
             "type": "leaf",
             "state": {
               "type": "empty",
@@ -179,8 +179,13 @@
       "bases:Create new base": false
     }
   },
-  "active": "74f5b2ff716cb50e",
+  "active": "e02a9e565658ebc5",
   "lastOpenFiles": [
+    "Pending_Approval/WHATSAPP_REPLY_2026-03-28_B__S_Computer_science_girls_group.md",
+    "Inbox/WHATSAPP_20260328_184925_B__S_Computer_science_girls_group.md",
+    "Pending_Approval/WHATSAPP_REPLY_2026-03-28_GIAIC_03_AI_Spec-Driven_Online_Hackathon.md",
+    "Inbox/WHATSAPP_20260328_184753_GIAIC_03_AI_Spec-Driven_Online_Hackathon.md",
+    "Logs/2026-03-28.log",
     "Rejected/WHATSAPP_REPLY_2026-03-26_B__S_Computer_science_girls_group.md",
     "Rejected/WHATSAPP_REPLY_2026-03-26_GIAIC_03_AI_Spec-Driven_Online_Hackathon.md",
     "Business_Goals.md",
@@ -207,15 +212,10 @@
     "Approved/WHATSAPP_REPLY_2026-03-14_Mine.md",
     "Inbox/WHATSAPP_20260314_224050_Mine.md",
     "Inbox/WHATSAPP_20260314_222508_B__S_Computer_science_girls_group.md",
-    "Inbox/WHATSAPP_20260314_222508_Mine.md",
-    "Inbox/WHATSAPP_20260314_222508_GIAIC_03_AI_Spec-Driven_Online_Hackathon.md",
-    "Approved/INSTAGRAM_2026-03-14.md",
-    "Done/INSTAGRAM_2026-03-14.md",
     "Logs/2026-03-12.log",
     "Logs/2026-03-11.log",
     "Logs/2026-03-10.log",
     "Logs/2026-03-01.log",
-    "Dashboard.md.tmp.14267.1772270937653",
-    "Dashboard.md.tmp.14267.1772270921479"
+    "Dashboard.md.tmp.14267.1772270937653"
   ]
 }
