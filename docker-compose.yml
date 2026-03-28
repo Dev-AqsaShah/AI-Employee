@@ -43,16 +43,17 @@ services:
       db:
         condition: service_healthy
     environment:
-      HOST:     db
-      PORT:     5432
-      USER:     ${POSTGRES_USER:-odoo}
-      PASSWORD: ${POSTGRES_PASSWORD:-odoo_secret}
+      HOST:              db
+      PORT:              5432
+      USER:              ${POSTGRES_USER:-odoo}
+      PASSWORD:          ${POSTGRES_PASSWORD:-odoo_secret}
+      ODOO_MASTER_PASSWORD: admin123
     ports:
       - "8069:8069"
     volumes:
       - odoo_data:/var/lib/odoo
-      - ./odoo_addons:/mnt/extra-addons   # Custom addons (optional)
-    command: --db_host=db --db_port=5432 --db_user=${POSTGRES_USER:-odoo} --db_password=${POSTGRES_PASSWORD:-odoo_secret}
+      - ./odoo_addons:/mnt/extra-addons
+    command: --db_host=db --db_port=5432 --db_user=${POSTGRES_USER:-odoo} --db_password=${POSTGRES_PASSWORD:-odoo_secret} --admin-passwd=admin123
 
 volumes:
   postgres_data:
