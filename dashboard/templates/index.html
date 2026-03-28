@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Aqsa's AI Employee</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Inter', sans-serif; box-sizing: border-box; }
+    h1, .logo-text { font-family: 'Space Grotesk', sans-serif; }
+    body { background: #040712; color: #e2e8f0; min-height: 100vh; margin: 0; }
+
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image: linear-gradient(rgba(99,102,241,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(99,102,241,0.025) 1px, transparent 1px);
+      background-size: 60px 60px;
+      pointer-events: none; z-index: 0;
+    }
+    .orb-1 { position:fixed; top:-200px; left:-200px; width:500px; height:500px; border-radius:50%; background:radial-gradient(circle,rgba(99,102,241,0.1),transparent 70%); pointer-events:none; z-index:0; animation:orbFloat 8s ease-in-out infinite; }
+    .orb-2 { position:fixed; bottom:-200px; right:-200px; width:400px; height:400px; border-radius:50%; background:radial-gradient(circle,rgba(168,85,247,0.08),transparent 70%); pointer-events:none; z-index:0; animation:orbFloat 10s ease-in-out infinite reverse; }
+    @keyframes orbFloat { 0%,100%{transform:translate(0,0);} 50%{transform:translate(20px,15px);} }
+
+    /* Layout */
+    .app-layout { display:flex; min-height:100vh; position:relative; z-index:1; }
+
+    /* Sidebar */
+    .sidebar {
+      width: 240px; flex-shrink: 0;
+      background: rgba(8,12,28,0.95);
+      border-right: 1px solid rgba(99,102,241,0.12);
+      display: flex; flex-direction: column;
+      position: fixed; top: 0; left: 0; bottom: 0;
+      z-index: 100; backdrop-filter: blur(20px);
+    }
+    .sidebar-logo {
+      padding: 20px 16px;
+      border-bottom: 1px solid rgba(99,102,241,0.1);
+    }
+    .nav-section-label {
+      font-size: 10px; font-weight: 600; letter-spacing: 0.1em;
+      color: #475569; text-transform: uppercase;
+      padding: 16px 16px 6px;
+    }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 14px; margin: 1px 8px;
+      border-radius: 10px; cursor: pointer;
+      font-size: 13px; font-weight: 500; color: #64748b;
+      transition: all 0.2s; border: 1px solid transparent;
+      text-decoration: none;
+    }
+    .nav-item:hover { color: #a5b4fc; background: rgba(99,102,241,0.08); }
+    .nav-item.active { color: #c7d2fe; background: rgba(99,102,241,0.15); border-color: rgba(99,102,241,0.2); }
+    .nav-item .nav-icon { width: 16px; text-align: center; font-size: 14px; flex-shrink: 0; }
+    .nav-badge { margin-left: auto; background: rgba(239,68,68,0.2); color: #f87171; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 999px; border: 1px solid rgba(239,68,68,0.3); }
+    .nav-badge.green { background: rgba(34,197,94,0.15); color: #4ade80; border-color: rgba(34,197,94,0.25); }
+
+    /* Main content */
+    .main-content { margin-left: 240px; flex: 1; padding: 24px; min-height: 100vh; }
+
+    /* Top bar */
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 24px;
+    }
+
+    /* Cards */
+    .glass-card {
+      background: rgba(10,15,35,0.8);
+      border: 1px solid rgba(99,102,241,0.12);
+      border-radius: 16px; backdrop-filter: blur(10px);
+    }
+    .glass-card:hover { border-color: rgba(99,102,241,0.25); }
+
+    /* Metric cards */
+    .metric-card {
+      background: rgba(10,15,35,0.8);
+      border: 1px solid rgba(99,102,241,0.12);
+      border-radius: 16px; padding: 20px;
+      transition: all 0.3s; cursor: pointer;
+    }
+    .metric-card:hover { transform: translateY(-2px); border-color: rgba(99,102,241,0.3); box-shadow: 0 8px 30px rgba(0,0,0,0.3); }
+
+    /* Status dot */
+    .dot-green { width:8px; height:8px; border-radius:50%; background:#22c55e; animation: pulseG 2s infinite; }
+    .dot-red   { width:8px; height:8px; border-radius:50%; background:#ef4444; }
+    .dot-yellow{ width:8px; height:8px; border-radius:50%; background:#f59e0b; animation: pulseY 2s infinite; }
+    @keyframes pulseG { 0%,100%{box-shadow:0 0 0 0 rgba(34,197,94,0.4);} 50%{box-shadow:0 0 0 5px rgba(34,197,94,0);} }
+    @keyframes pulseY { 0%,100%{box-shadow:0 0 0 0 rgba(245,158,11,0.4);} 50%{box-shadow:0 0 0 5px rgba(245,158,11,0);} }
+
+    /* Robot animation */
+    .robot-eye { animation: blink 4s ease-in-out infinite; }
+    @keyframes blink { 0%,88%,100%{transform:scaleY(1);} 92%{transform:scaleY(0.1);} }
+    .robot-float { animation: rFloat 3s ease-in-out infinite; }
+    @keyframes rFloat { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-3px);} }
+    .antenna-glow { animation: aGlow 2s ease-in-out infinite; }
+    @keyframes aGlow { 0%,100%{opacity:0.5;} 50%{opacity:1;filter:drop-shadow(0 0 3px #818cf8);} }
+
+    /* Platform badges */
+    .badge { font-size:10px; font-weight:700; padding:2px 8px; border-radius:999px; text-transform:uppercase; letter-spacing:0.05em; }
+    .badge-linkedin  { background:rgba(0,119,181,0.15); color:#38bdf8; border:1px solid rgba(0,119,181,0.25); }
+    .badge-instagram { background:rgba(225,48,108,0.15); color:#f472b6; border:1px solid rgba(225,48,108,0.25); }
+    .badge-twitter   { background:rgba(29,161,242,0.15); color:#7dd3fc; border:1px solid rgba(29,161,242,0.25); }
+    .badge-facebook  { background:rgba(24,119,242,0.15); color:#818cf8; border:1px solid rgba(24,119,242,0.25); }
+    .badge-whatsapp  { background:rgba(37,211,102,0.15); color:#4ade80; border:1px solid rgba(37,211,102,0.25); }
+    .badge-general   { background:rgba(139,92,246,0.15); color:#c084fc; border:1px solid rgba(139,92,246,0.25); }
+
+    /* Stripe */
+    .stripe { width:3px; border-radius:999px; align-self:stretch; flex-shrink:0; }
+    .stripe-linkedin  { background:#0077B5; }
+    .stripe-instagram { background:linear-gradient(180deg,#f09433,#dc2743,#bc1888); }
+    .stripe-twitter   { background:#1DA1F2; }
+    .stripe-facebook  { background:#1877F2; }
+    .stripe-whatsapp  { background:#25D366; }
+    .stripe-general   { background:#8B5CF6; }
+
+    /* Buttons */
+    .btn-primary { background:linear-gradient(135deg,#4f46e5,#7c3aed); color:white; border:none; border-radius:10px; padding:8px 18px; font-size:13px; font-weight:600; cursor:pointer; transition:all 0.2s; box-shadow:0 4px 15px rgba(79,70,229,0.3); }
+    .btn-primary:hover { transform:translateY(-1px); box-shadow:0 6px 20px rgba(79,70,229,0.4); }
+    .btn-approve { background:linear-gradient(135deg,#059669,#10b981); color:white; border:none; border-radius:9px; padding:7px 14px; font-size:12px; font-weight:700; cursor:pointer; transition:all 0.2s; }
+    .btn-approve:hover { transform:scale(1.04); box-shadow:0 4px 15px rgba(16,185,129,0.35); }
+    .btn-reject { background:rgba(239,68,68,0.12); color:#f87171; border:1px solid rgba(239,68,68,0.25); border-radius:9px; padding:7px 12px; font-size:12px; font-weight:700; cursor:pointer; transition:all 0.2s; }
+    .btn-reject:hover { background:rgba(239,68,68,0.22); transform:scale(1.04); }
+    .btn-outline { background:transparent; color:#94a3b8; border:1px solid rgba(99,102,241,0.2); border-radius:9px; padding:7px 14px; font-size:12px; font-weight:600; cursor:pointer; transition:all 0.2s; }
+    .btn-outline:hover { color:#a5b4fc; border-color:rgba(99,102,241,0.4); background:rgba(99,102,241,0.08); }
+
+    /* Alert cards */
+    .alert-card { border-radius:12px; padding:14px; border-left:3px solid; }
+    .alert-high   { background:rgba(239,68,68,0.08);  border-color:#ef4444; }
+    .alert-medium { background:rgba(245,158,11,0.08); border-color:#f59e0b; }
+    .alert-info   { background:rgba(99,102,241,0.08); border-color:#6366f1; }
+
+    /* Watcher rows */
+    .watcher-row { display:flex; align-items:center; gap:12px; padding:12px; border-radius:12px; background:rgba(10,15,35,0.6); border:1px solid rgba(255,255,255,0.05); margin-bottom:8px; }
+    .watcher-row.running { border-color:rgba(34,197,94,0.2); }
+
+    /* Log lines */
+    .log-line { font-family:monospace; font-size:11px; padding:3px 0; border-left:2px solid; padding-left:10px; margin-bottom:2px; }
+    .log-info  { border-color:#4f46e5; color:#94a3b8; }
+    .log-warn  { border-color:#f59e0b; color:#fbbf24; }
+    .log-error { border-color:#ef4444; color:#f87171; }
+
+    /* Panels */
+    .panel { display:none; animation:fadeUp 0.3s ease; }
+    .panel.active { display:block; }
+    @keyframes fadeUp { from{opacity:0;transform:translateY(10px);} to{opacity:1;transform:translateY(0);} }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width:4px; }
+    ::-webkit-scrollbar-track { background:#040712; }
+    ::-webkit-scrollbar-thumb { background:#1e293b; border-radius:2px; }
+
+    /* Mobile */
+    @media (max-width: 768px) {
+      .sidebar { width:200px; transform:translateX(-100%); transition:transform 0.3s; }
+      .sidebar.open { transform:translateX(0); }
+      .main-content { margin-left:0; padding:16px; }
+      .mob-menu-btn { display:flex !important; }
+    }
+
+    /* Toast */
+    #toast { position:fixed; bottom:20px; right:20px; z-index:9999; }
+    .toast-box { padding:12px 18px; border-radius:12px; font-size:13px; font-weight:600; color:white; box-shadow:0 8px 30px rgba(0,0,0,0.4); animation:slideIn 0.3s ease; }
+    @keyframes slideIn { from{transform:translateX(100%);opacity:0;} to{transform:translateX(0);opacity:1;} }
+    .t-success { background:linear-gradient(135deg,#059669,#10b981); }
+    .t-error   { background:linear-gradient(135deg,#dc2626,#ef4444); }
+    .t-info    { background:linear-gradient(135deg,#4f46e5,#7c3aed); }
+
+    /* Draft platform buttons */
+    .platform-btn { background:rgba(10,15,35,0.8); border:1px solid rgba(99,102,241,0.15); border-radius:14px; padding:18px; text-align:center; cursor:pointer; transition:all 0.3s; }
+    .platform-btn:hover { transform:translateY(-3px); border-color:rgba(99,102,241,0.4); box-shadow:0 8px 25px rgba(99,102,241,0.15); }
+
+    /* Modal */
+    #modal { position:fixed; inset:0; background:rgba(0,0,0,0.75); backdrop-filter:blur(4px); z-index:9998; display:none; align-items:center; justify-content:center; padding:16px; }
+    #modal.open { display:flex; }
+    .modal-box { background:#080c1e; border:1px solid rgba(99,102,241,0.2); border-radius:20px; width:100%; max-width:680px; max-height:85vh; display:flex; flex-direction:column; box-shadow:0 25px 60px rgba(0,0,0,0.6); }
+  </style>
+</head>
+<body>
+<div class="orb-1"></div>
+<div class="orb-2"></div>
+
+<div class="app-layout">
+
+  <!-- ═══════════════ SIDEBAR ═══════════════ -->
+  <aside class="sidebar" id="sidebar">
+    <!-- Logo -->
+    <div class="sidebar-logo">
+      <div class="flex items-center gap-3">
+        <div class="robot-float">
+          <svg width="32" height="32" viewBox="0 0 36 36" fill="none">
+            <line x1="18" y1="1" x2="18" y2="6" stroke="#818cf8" stroke-width="1.5" class="antenna-glow"/>
+            <circle cx="18" cy="1" r="1.5" fill="#a78bfa" class="antenna-glow"/>
+            <rect x="8" y="6" width="20" height="14" rx="4" fill="#1e1b4b" stroke="#4f46e5" stroke-width="1"/>
+            <rect x="11" y="10" width="5" height="5" rx="1.5" fill="#6366f1" class="robot-eye"/>
+            <rect x="20" y="10" width="5" height="5" rx="1.5" fill="#6366f1" class="robot-eye"/>
+            <rect x="12" y="11" width="2" height="2" rx="0.5" fill="#c7d2fe"/>
+            <rect x="21" y="11" width="2" height="2" rx="0.5" fill="#c7d2fe"/>
+            <rect x="10" y="22" width="16" height="11" rx="3" fill="#1e1b4b" stroke="#4f46e5" stroke-width="1"/>
+            <circle cx="18" cy="27" r="2.5" fill="#4f46e5" opacity="0.8"/>
+            <circle cx="18" cy="27" r="1.2" fill="#a5b4fc"/>
+          </svg>
+        </div>
+        <div>
+          <div class="logo-text font-bold text-white text-sm leading-tight">Aqsa's AI</div>
+          <div class="logo-text font-bold text-sm leading-tight" style="background:linear-gradient(135deg,#818cf8,#c084fc);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">Employee</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Nav -->
+    <nav class="flex-1 overflow-y-auto py-2">
+
+      <div class="nav-section-label">Operations</div>
+      <a class="nav-item active" onclick="showPanel('overview')" id="nav-overview">
+        <span class="nav-icon">▦</span> Overview
+      </a>
+      <a class="nav-item" onclick="showPanel('approvals')" id="nav-approvals">
+        <span class="nav-icon">◈</span> Approvals
+        <span class="nav-badge" id="nb-pending">{{ stats.pending }}</span>
+      </a>
+      <a class="nav-item" onclick="showPanel('operations')" id="nav-operations">
+        <span class="nav-icon">⊙</span> Operations Hub
+      </a>
+      <a class="nav-item" onclick="showPanel('alerts')" id="nav-alerts">
+        <span class="nav-icon">⚠</span> Critical Alerts
+        <span class="nav-badge" id="nb-alerts">0</span>
+      </a>
+
+      <div class="nav-section-label">Content</div>
+      <a class="nav-item" onclick="showPanel('draft')" id="nav-draft">
+        <span class="nav-icon">✦</span> Draft Post
+      </a>
+      <a class="nav-item" onclick="showPanel('approved')" id="nav-approved">
+        <span class="nav-icon">◉</span> Approved
+      </a>
+      <a class="nav-item" onclick="showPanel('done')" id="nav-done">
+        <span class="nav-icon">◎</span> Done
+      </a>
+      <a class="nav-item" onclick="showPanel('inbox')" id="nav-inbox">
+        <span class="nav-icon">◻</span> Inbox
+        <span class="nav-badge green" id="nb-inbox">{{ stats.inbox }}</span>
+      </a>
+
+      <div class="nav-section-label">Monitoring</div>
+      <a class="nav-item" onclick="showPanel('health')" id="nav-health">
+        <span class="nav-icon">◈</span> System Health
+      </a>
+      <a class="nav-item" onclick="showPanel('briefings')" id="nav-briefings">
+        <span class="nav-icon">◑</span> CEO Briefings
+      </a>
+      <a class="nav-item" onclick="showPanel('logs')" id="nav-logs">
+        <span class="nav-icon">≡</span> Raw Logs
+      </a>
+
+    </nav>
+
+    <!-- System status -->
+    <div style="padding:14px;border-top:1px solid rgba(99,102,241,0.1);">
+      <div class="flex items-center gap-2 mb-2">
+        <div class="dot-green"></div>
+        <span style="font-size:12px;color:#4ade80;font-weight:600;">System Online</span>
+      </div>
+      <div style="font-size:11px;color:#475569;">AI Employee v2.0 Gold</div>
+    </div>
+  </aside>
+
+  <!-- ═══════════════ MAIN CONTENT ═══════════════ -->
+  <main class="main-content">
+
+    <!-- Top bar -->
+    <div class="topbar">
+      <div>
+        <h2 class="text-xl font-bold text-white" id="page-title">Overview</h2>
+        <p class="text-xs text-slate-500 mt-0.5" id="page-sub">Real-time AI Employee status</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <button onclick="refreshAll()" class="btn-outline flex items-center gap-2">
+          <svg id="refreshIcon" xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          Refresh
+        </button>
+      </div>
+    </div>
+
+    <!-- ══ PANEL: Overview ══ -->
+    <div id="panel-overview" class="panel active">
+
+      <!-- Metric cards -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div class="metric-card" onclick="showPanel('approvals')">
+          <div style="font-size:11px;color:#64748b;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;margin-bottom:8px;">Pending Approvals</div>
+          <div class="flex items-end justify-between">
+            <div id="ov-pending" class="text-3xl font-bold" style="color:#fbbf24;">{{ stats.pending }}</div>
+            <div class="dot-yellow"></div>
+          </div>
+          <div style="font-size:11px;color:#64748b;margin-top:6px;">Awaiting your review</div>
+        </div>
+
+        <div class="metric-card" onclick="showPanel('health')">
+          <div style="font-size:11px;color:#64748b;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;margin-bottom:8px;">Active AI Loops</div>
+          <div class="flex items-end justify-between">
+            <div id="ov-loops" class="text-3xl font-bold" style="color:#4ade80;">—</div>
+            <div class="dot-green"></div>
+          </div>
+          <div style="font-size:11px;color:#64748b;margin-top:6px;">Watchers running</div>
+        </div>
+
+        <div class="metric-card" onclick="showPanel('alerts')">
+          <div style="font-size:11px;color:#64748b;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;margin-bottom:8px;">High-Risk Actions</div>
+          <div class="flex items-end justify-between">
+            <div id="ov-highrisk" class="text-3xl font-bold" style="color:#f87171;">{{ stats.needs_action }}</div>
+            <div class="dot-red"></div>
+          </div>
+          <div style="font-size:11px;color:#64748b;margin-top:6px;">Need immediate action</div>
+        </div>
+
+        <div class="metric-card" onclick="showPanel('done')">
+          <div style="font-size:11px;color:#64748b;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;margin-bottom:8px;">Tasks Completed</div>
+          <div class="flex items-end justify-between">
+            <div id="ov-done" class="text-3xl font-bold" style="color:#60a5fa;">{{ stats.done }}</div>
+            <div style="width:8px;height:8px;border-radius:50%;background:#60a5fa;"></div>
+          </div>
+          <div style="font-size:11px;color:#64748b;margin-top:6px;">Total posts published</div>
+        </div>
+      </div>
+
+      <!-- Two column layout -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+
+        <!-- Recent Pending -->
+        <div class="glass-card p-5">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold text-white text-sm">Pending Approvals</h3>
+            <button onclick="showPanel('approvals')" class="btn-outline" style="padding:4px 12px;font-size:11px;">View All</button>
+          </div>
+          <div id="ov-pending-list">
+            {% for file in pending[:3] %}
+            <div class="flex items-center gap-3 py-3" style="border-bottom:1px solid rgba(255,255,255,0.05);">
+              <div class="stripe stripe-{{ file.platform }}"></div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 mb-0.5">
+                  <span class="badge badge-{{ file.platform }}">{{ file.platform }}</span>
+                  <span style="font-size:11px;color:#475569;">{{ file.modified }}</span>
+                </div>
+                <p style="font-size:12px;color:#94a3b8;" class="truncate">{{ file.name }}</p>
+              </div>
+              <div class="flex gap-1">
+                <button class="btn-approve" style="padding:5px 10px;font-size:11px;" onclick="approveFile('{{ file.name }}','ov-{{ loop.index }}')">Approve</button>
+                <button class="btn-reject" style="padding:5px 8px;font-size:11px;" onclick="rejectFile('{{ file.name }}','ov-{{ loop.index }}')">Reject</button>
+              </div>
+            </div>
+            {% else %}
+            <div class="text-center py-8" style="color:#475569;">
+              <p style="font-size:13px;">No pending approvals</p>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <!-- System Status -->
+        <div class="glass-card p-5">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold text-white text-sm">System Health</h3>
+            <button onclick="showPanel('health')" class="btn-outline" style="padding:4px 12px;font-size:11px;">Details</button>
+          </div>
+          <div id="ov-health-list">
+            <div style="color:#475569;font-size:12px;">Loading...</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ══ PANEL: Approvals ══ -->
+    <div id="panel-approvals" class="panel">
+      <div id="approvals-list" class="space-y-3">
+        {% for file in pending %}
+        <div class="glass-card p-4" id="acard-{{ loop.index }}">
+          <div class="flex items-center gap-3">
+            <div class="stripe stripe-{{ file.platform }}"></div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="badge badge-{{ file.platform }}">{{ file.platform }}</span>
+                <span style="font-size:11px;color:#475569;">{{ file.modified }}</span>
+              </div>
+              <p class="text-sm font-medium text-white truncate">{{ file.name }}</p>
+              {% if file.preview %}<p style="font-size:11px;color:#64748b;margin-top:3px;" class="line-clamp-2">{{ file.preview }}</p>{% endif %}
+            </div>
+            <div class="flex items-center gap-2 flex-shrink-0">
+              <button class="btn-outline" style="padding:6px 10px;" onclick="viewFile('pending','{{ file.name }}')">View</button>
+              <button class="btn-approve" onclick="approveFile('{{ file.name }}','acard-{{ loop.index }}')">Approve</button>
+              <button class="btn-reject" onclick="rejectFile('{{ file.name }}','acard-{{ loop.index }}')">Reject</button>
+            </div>
+          </div>
+        </div>
+        {% else %}
+        <div class="text-center py-20">
+          <div class="robot-float inline-block mb-4">
+            <svg width="56" height="56" viewBox="0 0 36 36" fill="none">
+              <line x1="18" y1="1" x2="18" y2="6" stroke="#818cf8" stroke-width="1.5"/>
+              <circle cx="18" cy="1" r="1.5" fill="#a78bfa"/>
+              <rect x="8" y="6" width="20" height="14" rx="4" fill="#1e1b4b" stroke="#4f46e5" stroke-width="1"/>
+              <rect x="11" y="10" width="5" height="5" rx="1.5" fill="#4ade80" class="robot-eye"/>
+              <rect x="20" y="10" width="5" height="5" rx="1.5" fill="#4ade80" class="robot-eye"/>
+              <rect x="10" y="22" width="16" height="11" rx="3" fill="#1e1b4b" stroke="#4ade80" stroke-width="1"/>
+              <circle cx="18" cy="27" r="2.5" fill="#4ade80" opacity="0.8"/>
+            </svg>
+          </div>
+          <p class="font-semibold" style="color:#94a3b8;">All approvals cleared</p>
+          <p style="font-size:12px;color:#475569;margin-top:4px;">Your AI Employee is on top of everything.</p>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- ══ PANEL: Operations Hub ══ -->
+    <div id="panel-operations" class="panel">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+
+        <!-- Automation Loops -->
+        <div class="glass-card p-5">
+          <h3 class="font-semibold text-white mb-1">Automation Loops</h3>
+          <p style="font-size:12px;color:#64748b;margin-bottom:16px;">Monitor and control active AI loops</p>
+          <div id="ops-watcher-list">
+            <div style="color:#475569;font-size:12px;">Loading...</div>
+          </div>
+        </div>
+
+        <!-- Task Assignment -->
+        <div class="glass-card p-5">
+          <h3 class="font-semibold text-white mb-1">Assign Task to AI</h3>
+          <p style="font-size:12px;color:#64748b;margin-bottom:16px;">Manually trigger AI actions</p>
+
+          <div style="margin-bottom:12px;">
+            <label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Quick Actions</label>
+            <div class="grid grid-cols-2 gap-2">
+              <button onclick="draftPost('linkedin')" class="btn-outline flex items-center gap-2" style="justify-content:center;padding:10px;">
+                <div style="width:18px;height:18px;border-radius:4px;background:#0077B5;display:flex;align-items:center;justify-content:center;color:white;font-size:10px;font-weight:700;">in</div>
+                Draft LinkedIn
+              </button>
+              <button onclick="draftPost('instagram')" class="btn-outline flex items-center gap-2" style="justify-content:center;padding:10px;">
+                <div style="width:18px;height:18px;border-radius:4px;background:linear-gradient(135deg,#f09433,#dc2743);display:flex;align-items:center;justify-content:center;color:white;font-size:9px;font-weight:700;">IG</div>
+                Draft Instagram
+              </button>
+              <button onclick="draftPost('twitter')" class="btn-outline flex items-center gap-2" style="justify-content:center;padding:10px;">
+                <div style="width:18px;height:18px;border-radius:4px;background:#1DA1F2;display:flex;align-items:center;justify-content:center;color:white;font-size:11px;font-weight:700;">X</div>
+                Draft Twitter
+              </button>
+              <button onclick="draftPost('facebook')" class="btn-outline flex items-center gap-2" style="justify-content:center;padding:10px;">
+                <div style="width:18px;height:18px;border-radius:4px;background:#1877F2;display:flex;align-items:center;justify-content:center;color:white;font-size:11px;font-weight:700;">f</div>
+                Draft Facebook
+              </button>
+            </div>
+          </div>
+
+          <div id="ops-draft-result" class="hidden mt-3"></div>
+
+          <div style="margin-top:16px;padding:14px;border-radius:12px;background:rgba(99,102,241,0.05);border:1px solid rgba(99,102,241,0.12);">
+            <div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">Execution Status</div>
+            <div class="flex items-center gap-2 mb-2">
+              <div class="dot-green"></div>
+              <span style="font-size:12px;color:#94a3b8;">Orchestrator running</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <div class="dot-green"></div>
+              <span style="font-size:12px;color:#94a3b8;">Auto-post on approval</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ PANEL: Critical Alerts ══ -->
+    <div id="panel-alerts" class="panel">
+      <div id="alerts-content">
+        <div style="color:#475569;font-size:12px;">Loading alerts...</div>
+      </div>
+    </div>
+
+    <!-- ══ PANEL: Draft Post ══ -->
+    <div id="panel-draft" class="panel">
+      <div class="glass-card p-6 max-w-2xl">
+        <div class="flex items-center gap-3 mb-6">
+          <div class="robot-float">
+            <svg width="40" height="40" viewBox="0 0 36 36" fill="none">
+              <line x1="18" y1="1" x2="18" y2="6" stroke="#818cf8" stroke-width="1.5" class="antenna-glow"/>
+              <circle cx="18" cy="1" r="1.5" fill="#a78bfa" class="antenna-glow"/>
+              <rect x="8" y="6" width="20" height="14" rx="4" fill="#1e1b4b" stroke="#4f46e5" stroke-width="1"/>
+              <rect x="11" y="10" width="5" height="5" rx="1.5" fill="#6366f1" class="robot-eye"/>
+              <rect x="20" y="10" width="5" height="5" rx="1.5" fill="#6366f1" class="robot-eye"/>
+              <rect x="12" y="11" width="2" height="2" rx="0.5" fill="#c7d2fe"/>
+              <rect x="21" y="11" width="2" height="2" rx="0.5" fill="#c7d2fe"/>
+              <rect x="10" y="22" width="16" height="11" rx="3" fill="#1e1b4b" stroke="#4f46e5" stroke-width="1"/>
+              <circle cx="18" cy="27" r="2.5" fill="#4f46e5" opacity="0.8"/><circle cx="18" cy="27" r="1.2" fill="#a5b4fc"/>
+            </svg>
+          </div>
+          <div>
+            <h2 class="font-bold text-white">Draft a Post</h2>
+            <p style="font-size:12px;color:#64748b;">AI drafts using your Business Goals strategy</p>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <button onclick="draftPost('linkedin','draft-result')" class="platform-btn">
+            <div style="width:36px;height:36px;border-radius:10px;background:#0077B5;display:flex;align-items:center;justify-content:center;color:white;font-weight:700;margin:0 auto 10px;">in</div>
+            <div style="font-weight:600;font-size:13px;color:#38bdf8;">LinkedIn</div>
+            <div style="font-size:11px;color:#475569;margin-top:2px;">Professional · 1300 chars</div>
+          </button>
+          <button onclick="draftPost('instagram','draft-result')" class="platform-btn">
+            <div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#f09433,#dc2743,#bc1888);display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:11px;margin:0 auto 10px;">IG</div>
+            <div style="font-weight:600;font-size:13px;color:#f472b6;">Instagram</div>
+            <div style="font-size:11px;color:#475569;margin-top:2px;">Visual · Caption</div>
+          </button>
+          <button onclick="draftPost('twitter','draft-result')" class="platform-btn">
+            <div style="width:36px;height:36px;border-radius:10px;background:#1DA1F2;display:flex;align-items:center;justify-content:center;color:white;font-weight:700;margin:0 auto 10px;">X</div>
+            <div style="font-weight:600;font-size:13px;color:#7dd3fc;">Twitter / X</div>
+            <div style="font-size:11px;color:#475569;margin-top:2px;">280 chars</div>
+          </button>
+          <button onclick="draftPost('facebook','draft-result')" class="platform-btn">
+            <div style="width:36px;height:36px;border-radius:10px;background:#1877F2;display:flex;align-items:center;justify-content:center;color:white;font-weight:700;margin:0 auto 10px;">f</div>
+            <div style="font-weight:600;font-size:13px;color:#818cf8;">Facebook</div>
+            <div style="font-size:11px;color:#475569;margin-top:2px;">Community · 500 chars</div>
+          </button>
+        </div>
+        <div id="draft-result" class="hidden mt-4"></div>
+      </div>
+    </div>
+
+    <!-- ══ PANEL: Approved ══ -->
+    <div id="panel-approved" class="panel">
+      <div id="approved-list" class="space-y-3"><div style="color:#475569;font-size:13px;padding:40px 0;text-align:center;">Loading...</div></div>
+    </div>
+
+    <!-- ══ PANEL: Done ══ -->
+    <div id="panel-done" class="panel">
+      <div id="done-list" class="space-y-3"><div style="color:#475569;font-size:13px;padding:40px 0;text-align:center;">Loading...</div></div>
+    </div>
+
+    <!-- ══ PANEL: Inbox ══ -->
+    <div id="panel-inbox" class="panel">
+      <div id="inbox-list" class="space-y-3"><div style="color:#475569;font-size:13px;padding:40px 0;text-align:center;">Loading...</div></div>
+    </div>
+
+    <!-- ══ PANEL: System Health ══ -->
+    <div id="panel-health" class="panel">
+      <div class="glass-card p-5">
+        <h3 class="font-semibold text-white mb-4">Watcher Status</h3>
+        <div id="health-list">
+          <div style="color:#475569;font-size:12px;">Loading...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ PANEL: CEO Briefings ══ -->
+    <div id="panel-briefings" class="panel">
+      <div class="glass-card p-5">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-semibold text-white">CEO Briefings</h3>
+          <button onclick="loadBriefings()" class="btn-outline" style="padding:5px 12px;font-size:11px;">Refresh</button>
+        </div>
+        <div id="briefings-list">
+          <div style="color:#475569;font-size:12px;">Loading...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ PANEL: Raw Logs ══ -->
+    <div id="panel-logs" class="panel">
+      <div class="glass-card p-5">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-semibold text-white">Raw Activity Logs</h3>
+          <span style="font-size:11px;color:#475569;">Today's entries · Latest first</span>
+        </div>
+        <div id="log-list" style="font-family:monospace;max-height:500px;overflow-y:auto;">
+          <div style="color:#475569;font-size:11px;">Loading...</div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ══ Modal ══ -->
+<div id="modal" onclick="if(event.target===this)closeModal()">
+  <div class="modal-box">
+    <div style="padding:16px 20px;border-bottom:1px solid rgba(99,102,241,0.12);display:flex;align-items:center;justify-content:space-between;">
+      <span id="modal-title" style="font-weight:600;font-size:13px;color:white;"></span>
+      <button onclick="closeModal()" style="color:#64748b;background:none;border:none;cursor:pointer;font-size:18px;line-height:1;">✕</button>
+    </div>
+    <div id="modal-content" style="padding:20px;overflow-y:auto;flex:1;font-family:monospace;font-size:12px;color:#94a3b8;white-space:pre-wrap;line-height:1.6;"></div>
+  </div>
+</div>
+
+<!-- ══ Toast ══ -->
+<div id="toast"></div>
+
+<script>
+  const pageTitles = {
+    overview:'Overview', approvals:'Pending Approvals', operations:'Operations Hub',
+    alerts:'Critical Alerts', draft:'Draft Post', approved:'Approved Posts',
+    done:'Completed Posts', inbox:'Inbox', health:'System Health',
+    briefings:'CEO Briefings', logs:'Raw Logs'
+  };
+  const pageSubs = {
+    overview:'Real-time AI Employee status', approvals:'Review and approve AI-drafted content',
+    operations:'Control automation loops and assign tasks', alerts:'High-priority items requiring attention',
+    draft:'AI-powered content drafting', approved:'Posts approved and queued for publishing',
+    done:'Successfully published posts', inbox:'Incoming messages and notifications',
+    health:'Active watchers and system components', briefings:'Weekly executive reports',
+    logs:'Detailed activity and audit trail'
+  };
+
+  function showPanel(name) {
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    const panel = document.getElementById('panel-' + name);
+    if (panel) panel.classList.add('active');
+    const nav = document.getElementById('nav-' + name);
+    if (nav) nav.classList.add('active');
+    document.getElementById('page-title').textContent = pageTitles[name] || name;
+    document.getElementById('page-sub').textContent = pageSubs[name] || '';
+    const loaders = { approved: loadApproved, done: loadDone, inbox: loadInbox, health: loadHealth, briefings: loadBriefings, logs: loadLogs, operations: loadOpsWatchers, alerts: loadAlerts };
+    if (loaders[name]) loaders[name]();
+  }
+
+  // ── Toast ──
+  function toast(msg, type='success') {
+    const t = document.getElementById('toast');
+    const box = document.createElement('div');
+    box.className = 'toast-box t-' + type;
+    box.textContent = msg;
+    t.innerHTML = '';
+    t.appendChild(box);
+    setTimeout(() => t.innerHTML = '', 3500);
+  }
+
+  // ── Approve / Reject ──
+  async function approveFile(filename, cardId) {
+    const card = document.getElementById(cardId);
+    if (card) { card.style.opacity = '0.4'; card.style.pointerEvents = 'none'; }
+    const res = await fetch('/api/approve/' + encodeURIComponent(filename), {method:'POST'});
+    const data = await res.json();
+    if (data.status === 'approved') {
+      if (card) { card.style.transition='all 0.4s'; card.style.transform='translateX(60px)'; card.style.opacity='0'; setTimeout(()=>card.remove(),400); }
+      toast('Approved — watcher will post it.', 'success');
+      refreshStats();
+    } else {
+      toast(data.error || 'Error approving', 'error');
+      if (card) { card.style.opacity='1'; card.style.pointerEvents=''; }
+    }
+  }
+
+  async function rejectFile(filename, cardId) {
+    const card = document.getElementById(cardId);
+    if (card) { card.style.opacity='0.4'; card.style.pointerEvents='none'; }
+    const res = await fetch('/api/reject/' + encodeURIComponent(filename), {method:'POST'});
+    const data = await res.json();
+    if (data.status === 'rejected') {
+      if (card) { card.style.transition='all 0.4s'; card.style.transform='translateX(-60px)'; card.style.opacity='0'; setTimeout(()=>card.remove(),400); }
+      toast('Rejected.', 'info');
+      refreshStats();
+    } else {
+      toast(data.error || 'Error', 'error');
+      if (card) { card.style.opacity='1'; card.style.pointerEvents=''; }
+    }
+  }
+
+  // ── View File ──
+  async function viewFile(folder, filename) {
+    const res = await fetch('/api/file/'+folder+'/'+encodeURIComponent(filename));
+    const data = await res.json();
+    document.getElementById('modal-title').textContent = filename;
+    document.getElementById('modal-content').textContent = data.content || '(empty)';
+    document.getElementById('modal').classList.add('open');
+  }
+  function closeModal() { document.getElementById('modal').classList.remove('open'); }
+
+  // ── Draft Post ──
+  async function draftPost(platform, resultId='draft-result') {
+    const div = document.getElementById(resultId);
+    if (div) { div.classList.remove('hidden'); div.innerHTML = `<div style="padding:12px;border-radius:10px;background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.15);font-size:12px;color:#818cf8;">Drafting ${platform} post with AI...</div>`; }
+    const res = await fetch('/api/draft/'+platform, {method:'POST'});
+    const data = await res.json();
+    if (data.status === 'drafted') {
+      if (div) div.innerHTML = `<div style="padding:12px;border-radius:10px;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);font-size:12px;color:#4ade80;">Draft created for ${platform}. Check Pending Approvals.</div>`;
+      toast('Post drafted for ' + platform, 'success');
+      refreshStats();
+    } else {
+      if (div) div.innerHTML = `<div style="padding:12px;border-radius:10px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);font-size:12px;color:#f87171;">${esc(data.error||data.detail||'Failed — check API credits.')}</div>`;
+    }
+  }
+
+  // ── Loaders ──
+  function renderCards(files, containerId, folder) {
+    const c = document.getElementById(containerId);
+    if (!files.length) { c.innerHTML = `<div style="text-align:center;padding:60px 0;color:#475569;font-size:13px;">No items here.</div>`; return; }
+    c.innerHTML = files.map(f => `
+      <div class="glass-card p-4" style="margin-bottom:10px;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div class="stripe stripe-${f.platform}"></div>
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+              <span class="badge badge-${f.platform}">${f.platform}</span>
+              <span style="font-size:11px;color:#475569;">${f.modified}</span>
+            </div>
+            <p style="font-size:13px;color:#cbd5e1;" class="truncate">${esc(f.name)}</p>
+          </div>
+          <button onclick="viewFile('${folder}','${f.name.replace(/'/g,"\\'")}')
+" class="btn-outline" style="padding:5px 12px;font-size:11px;flex-shrink:0;">View</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  async function loadApproved() { const r = await fetch('/api/approved'); renderCards(await r.json(),'approved-list','approved'); }
+  async function loadDone()     { const r = await fetch('/api/done');     renderCards(await r.json(),'done-list','done'); }
+  async function loadInbox()    { const r = await fetch('/api/inbox');    renderCards(await r.json(),'inbox-list','inbox'); }
+
+  async function loadHealth() {
+    const res = await fetch('/api/watcher-status');
+    const data = await res.json();
+    const icons = {filesystem_watcher:'FS',gmail_watcher:'GM',linkedin_watcher:'LI',facebook_watcher:'FB',instagram_watcher:'IG',twitter_watcher:'TW',whatsapp_watcher:'WA',ralph_watcher:'RL',email_watcher:'EM'};
+    document.getElementById('health-list').innerHTML = Object.entries(data).map(([name,running]) => `
+      <div class="watcher-row ${running?'running':''}">
+        <div style="width:32px;height:32px;border-radius:8px;background:${running?'rgba(34,197,94,0.1)':'rgba(99,102,241,0.08)'};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:${running?'#4ade80':'#64748b'};border:1px solid ${running?'rgba(34,197,94,0.2)':'rgba(99,102,241,0.1)'};">${icons[name]||'??'}</div>
+        <div style="flex:1;">
+          <p style="font-size:13px;font-weight:500;color:white;">${name.replace(/_/g,' ').replace(/\b\w/g,l=>l.toUpperCase())}</p>
+          <p style="font-size:11px;color:${running?'#4ade80':'#475569'};">${running?'Running':'Not detected'}</p>
+        </div>
+        <div class="${running?'dot-green':'dot-red'}"></div>
+      </div>
+    `).join('');
+  }
+
+  async function loadOpsWatchers() {
+    const res = await fetch('/api/watcher-status');
+    const data = await res.json();
+    const running = Object.values(data).filter(Boolean).length;
+    document.getElementById('ops-watcher-list').innerHTML = `
+      <div style="padding:14px;border-radius:12px;background:rgba(99,102,241,0.05);border:1px solid rgba(99,102,241,0.12);margin-bottom:12px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:13px;color:#94a3b8;">Active Loops</span>
+          <span style="font-size:20px;font-weight:700;color:#4ade80;">${running}</span>
+        </div>
+        <div style="font-size:11px;color:#475569;margin-top:4px;">of ${Object.keys(data).length} total watchers</div>
+      </div>
+      ${Object.entries(data).map(([name,running])=>`
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
+          <div class="${running?'dot-green':'dot-red'}"></div>
+          <span style="font-size:12px;color:${running?'#94a3b8':'#475569'};">${name.replace(/_/g,' ').replace(/\b\w/g,l=>l.toUpperCase())}</span>
+          <span style="margin-left:auto;font-size:11px;color:${running?'#4ade80':'#475569'};">${running?'Active':'Stopped'}</span>
+        </div>
+      `).join('')}
+    `;
+  }
+
+  async function loadAlerts() {
+    const res = await fetch('/api/stats');
+    const stats = await res.json();
+    const alerts = [];
+    if (stats.pending > 0) alerts.push({level:'medium', title:`${stats.pending} posts awaiting approval`, detail:'Review and approve posts in Pending Approvals to publish them.', action:"showPanel('approvals')"});
+    if (stats.needs_action > 0) alerts.push({level:'high', title:`${stats.needs_action} items need immediate action`, detail:'Check Needs Action folder for urgent tasks.', action:"showPanel('inbox')"});
+    if (stats.inbox > 0) alerts.push({level:'info', title:`${stats.inbox} new messages in Inbox`, detail:'New emails or WhatsApp messages detected.', action:"showPanel('inbox')"});
+    document.getElementById('nb-alerts').textContent = alerts.filter(a=>a.level==='high').length;
+    const c = document.getElementById('alerts-content');
+    if (!alerts.length) { c.innerHTML = `<div style="text-align:center;padding:60px;color:#475569;font-size:13px;">No critical alerts at this time.</div>`; return; }
+    c.innerHTML = `<div style="display:flex;flex-direction:column;gap:12px;">` + alerts.map(a=>`
+      <div class="alert-card alert-${a.level}">
+        <div style="display:flex;items-align:center;justify-content:space-between;gap:12px;">
+          <div>
+            <p style="font-weight:600;font-size:13px;color:${a.level==='high'?'#f87171':a.level==='medium'?'#fbbf24':'#818cf8'};">${esc(a.title)}</p>
+            <p style="font-size:12px;color:#64748b;margin-top:4px;">${esc(a.detail)}</p>
+          </div>
+          <button onclick="${a.action}" class="btn-outline" style="padding:5px 12px;font-size:11px;flex-shrink:0;">View</button>
+        </div>
+      </div>
+    `).join('') + '</div>';
+  }
+
+  async function loadBriefings() {
+    const res = await fetch('/api/briefings');
+    const files = await res.json();
+    const c = document.getElementById('briefings-list');
+    if (!files.length) { c.innerHTML = `<div style="text-align:center;padding:40px;color:#475569;font-size:13px;">No briefings yet. Run CEO Briefing to generate one.</div>`; return; }
+    c.innerHTML = files.map(f=>`
+      <div class="glass-card p-4" style="margin-bottom:10px;cursor:pointer;" onclick="viewFile('briefings','${f.name}')">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <p style="font-weight:600;font-size:13px;color:white;">${esc(f.name)}</p>
+            <p style="font-size:11px;color:#475569;margin-top:2px;">${f.modified}</p>
+          </div>
+          <span class="btn-outline" style="padding:5px 12px;font-size:11px;">Read</span>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  async function loadLogs() {
+    const res = await fetch('/api/logs');
+    const logs = await res.json();
+    const c = document.getElementById('log-list');
+    if (!logs.length) { c.innerHTML = '<div style="color:#475569;font-size:11px;padding:20px 0;text-align:center;">No logs for today yet.</div>'; return; }
+    c.innerHTML = logs.map(line => {
+      const cls = line.includes('ERROR')?'log-error':line.includes('WARN')?'log-warn':'log-info';
+      return `<div class="log-line ${cls}">${esc(line)}</div>`;
+    }).join('');
+  }
+
+  // ── Stats refresh ──
+  async function refreshStats() {
+    const res = await fetch('/api/stats');
+    const d = await res.json();
+    document.getElementById('ov-pending').textContent  = d.pending;
+    document.getElementById('ov-done').textContent     = d.done;
+    document.getElementById('ov-highrisk').textContent = d.needs_action;
+    document.getElementById('nb-pending').textContent  = d.pending;
+    document.getElementById('nb-inbox').textContent    = d.inbox;
+  }
+
+  async function refreshAll() {
+    const icon = document.getElementById('refreshIcon');
+    icon.style.animation = 'spin 0.5s linear';
+    setTimeout(()=>icon.style.animation='',600);
+    refreshStats();
+    // refresh active loops count
+    const wRes = await fetch('/api/watcher-status');
+    const wData = await wRes.json();
+    const running = Object.values(wData).filter(Boolean).length;
+    document.getElementById('ov-loops').textContent = running;
+    toast('Refreshed', 'info');
+  }
+
+  function esc(str) {
+    return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // Load overview health on start
+  async function initOverview() {
+    const wRes = await fetch('/api/watcher-status');
+    const wData = await wRes.json();
+    const running = Object.values(wData).filter(Boolean).length;
+    document.getElementById('ov-loops').textContent = running;
+    // Mini health list in overview
+    const icons = {filesystem_watcher:'FS',gmail_watcher:'GM',linkedin_watcher:'LI',facebook_watcher:'FB',instagram_watcher:'IG',twitter_watcher:'TW',whatsapp_watcher:'WA',ralph_watcher:'RL',email_watcher:'EM'};
+    document.getElementById('ov-health-list').innerHTML = Object.entries(wData).slice(0,6).map(([name,run])=>`
+      <div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
+        <div class="${run?'dot-green':'dot-red'}"></div>
+        <span style="font-size:12px;color:${run?'#94a3b8':'#475569'};">${name.replace(/_/g,' ').replace(/\b\w/g,l=>l.toUpperCase())}</span>
+        <span style="margin-left:auto;font-size:11px;color:${run?'#4ade80':'#64748b'};">${run?'Running':'Stopped'}</span>
+      </div>
+    `).join('');
+    loadAlerts();
+  }
+
+  const styleEl = document.createElement('style');
+  styleEl.textContent = '@keyframes spin{to{transform:rotate(360deg)}}';
+  document.head.appendChild(styleEl);
+
+  setInterval(refreshStats, 30000);
+  initOverview();
+</script>
+</body>
+</html>
