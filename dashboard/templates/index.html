@@ -297,6 +297,7 @@
           <svg id="refreshIcon" xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
           <span class="hidden sm:inline">Refresh</span>
         </button>
+        <button id="login-btn" onclick="isLoggedIn ? doLogout() : showLoginModal()" class="btn-primary" style="padding:8px 14px;font-size:12px;">Login</button>
       </div>
     </div>
 
@@ -560,6 +561,37 @@
     </div>
 
   </main>
+</div>
+
+<!-- ══ Login Modal ══ -->
+<div id="login-modal" style="position:fixed;inset:0;background:rgba(0,0,0,0.85);backdrop-filter:blur(6px);z-index:99999;display:none;align-items:center;justify-content:center;padding:16px;">
+  <div style="background:#080c1e;border:1px solid rgba(99,102,241,0.3);border-radius:20px;width:100%;max-width:380px;padding:32px;box-shadow:0 25px 60px rgba(0,0,0,0.6);">
+    <div style="text-align:center;margin-bottom:24px;">
+      <div class="robot-float" style="display:inline-block;margin-bottom:12px;">
+        <svg width="40" height="40" viewBox="0 0 36 36" fill="none">
+          <line x1="18" y1="1" x2="18" y2="6" stroke="#818cf8" stroke-width="1.5" class="antenna-glow"/>
+          <circle cx="18" cy="1" r="1.5" fill="#a78bfa" class="antenna-glow"/>
+          <rect x="8" y="6" width="20" height="14" rx="4" fill="#1e1b4b" stroke="#4f46e5" stroke-width="1"/>
+          <rect x="11" y="10" width="5" height="5" rx="1.5" fill="#6366f1" class="robot-eye"/>
+          <rect x="20" y="10" width="5" height="5" rx="1.5" fill="#6366f1" class="robot-eye"/>
+          <rect x="10" y="22" width="16" height="11" rx="3" fill="#1e1b4b" stroke="#4f46e5" stroke-width="1"/>
+          <circle cx="18" cy="27" r="2.5" fill="#4f46e5" opacity="0.8"/>
+        </svg>
+      </div>
+      <h2 style="font-family:'Space Grotesk',sans-serif;font-weight:700;color:white;font-size:18px;">Admin Login</h2>
+      <p style="font-size:12px;color:#475569;margin-top:4px;">Required to approve or draft posts</p>
+    </div>
+    <div style="margin-bottom:14px;">
+      <label style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:6px;">Email</label>
+      <input id="login-email" type="email" placeholder="your@email.com" style="width:100%;background:rgba(10,15,35,0.8);border:1px solid rgba(99,102,241,0.2);border-radius:10px;padding:10px 14px;color:white;font-size:13px;outline:none;box-sizing:border-box;" onkeydown="if(event.key==='Enter')doLogin()"/>
+    </div>
+    <div style="margin-bottom:20px;">
+      <label style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:6px;">Password</label>
+      <input id="login-password" type="password" placeholder="••••••••" style="width:100%;background:rgba(10,15,35,0.8);border:1px solid rgba(99,102,241,0.2);border-radius:10px;padding:10px 14px;color:white;font-size:13px;outline:none;box-sizing:border-box;" onkeydown="if(event.key==='Enter')doLogin()"/>
+    </div>
+    <div id="login-error" style="display:none;padding:10px;border-radius:8px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);color:#f87171;font-size:12px;margin-bottom:14px;text-align:center;"></div>
+    <button onclick="doLogin()" class="btn-primary" style="width:100%;padding:12px;font-size:14px;">Login</button>
+  </div>
 </div>
 
 <!-- ══ Modal ══ -->
@@ -896,9 +928,78 @@
   styleEl.textContent = '@keyframes spin{to{transform:rotate(360deg)}}';
   document.head.appendChild(styleEl);
 
+  // ── Auth ──
+  let isLoggedIn = false;
+  let pendingAction = null;
+
+  async function checkAuth() {
+    const r = await fetch('/api/auth-status');
+    const d = await r.json();
+    isLoggedIn = d.logged_in;
+    updateLoginBtn();
+  }
+
+  function updateLoginBtn() {
+    const btn = document.getElementById('login-btn');
+    if (btn) btn.textContent = isLoggedIn ? 'Logout' : 'Login';
+  }
+
+  function showLoginModal(onSuccess) {
+    pendingAction = onSuccess || null;
+    document.getElementById('login-modal').style.display = 'flex';
+    document.getElementById('login-email').value = '';
+    document.getElementById('login-password').value = '';
+    document.getElementById('login-error').style.display = 'none';
+    setTimeout(() => document.getElementById('login-email').focus(), 100);
+  }
+
+  function hideLoginModal() {
+    document.getElementById('login-modal').style.display = 'none';
+  }
+
+  async function doLogin() {
+    const email = document.getElementById('login-email').value.trim();
+    const password = document.getElementById('login-password').value;
+    const errDiv = document.getElementById('login-error');
+    const res = await fetch('/api/login', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({email, password})});
+    const data = await res.json();
+    if (data.status === 'ok') {
+      isLoggedIn = true;
+      hideLoginModal();
+      updateLoginBtn();
+      toast('Logged in successfully', 'success');
+      if (pendingAction) { pendingAction(); pendingAction = null; }
+    } else {
+      errDiv.textContent = data.error || 'Login failed';
+      errDiv.style.display = 'block';
+    }
+  }
+
+  async function doLogout() {
+    await fetch('/api/logout', {method:'POST'});
+    isLoggedIn = false;
+    updateLoginBtn();
+    toast('Logged out', 'info');
+  }
+
+  function requireAuth(action) {
+    if (isLoggedIn) { action(); }
+    else { showLoginModal(action); }
+  }
+
+  // ── Override approve/reject/draft to require auth ──
+  const _approveFile = approveFile;
+  const _rejectFile  = rejectFile;
+  const _draftPost   = draftPost;
+
+  window.approveFile = (filename, cardId) => requireAuth(() => _approveFile(filename, cardId));
+  window.rejectFile  = (filename, cardId) => requireAuth(() => _rejectFile(filename, cardId));
+  window.draftPost   = (platform, resultId) => requireAuth(() => _draftPost(platform, resultId));
+
   setInterval(refreshStats, 30000);
   initOverview();
   loadApprovals();
+  checkAuth();
 </script>
 </body>
 </html>

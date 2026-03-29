@@ -13,8 +13,10 @@ import subprocess
 from pathlib import Path
 from datetime import datetime
 
-from flask import Flask, render_template, jsonify, request, redirect, url_for
+from flask import Flask, render_template, jsonify, request, redirect, url_for, session as flask_session
+from functools import wraps
 import base64
+import hashlib
 
 # ── Setup ────────────────────────────────────────────────────────────────────
 BASE_DIR   = Path(__file__).parent.parent
@@ -33,6 +35,19 @@ for d in [PENDING_DIR, APPROVED_DIR, REJECTED_DIR, DONE_DIR, INBOX_DIR, NEEDS_DI
 
 app = Flask(__name__, template_folder=str(Path(__file__).parent / "templates"))
 app.config["TEMPLATES_AUTO_RELOAD"] = True
+app.secret_key = "ai-employee-secret-2026-aqsa"
+
+# ── Auth ─────────────────────────────────────────────────────────────────────
+DASHBOARD_EMAIL    = "aqsashah000000@gmail.com"
+DASHBOARD_PASSWORD = hashlib.sha256("aqsaahshah120".encode()).hexdigest()
+
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not flask_session.get("logged_in"):
+            return jsonify({"error": "Unauthorized", "login_required": True}), 401
+        return f(*args, **kwargs)
+    return decorated
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -183,7 +198,30 @@ def api_file(folder, filename):
     return jsonify({"content": content})
 
 
+@app.route("/api/login", methods=["POST"])
+def api_login():
+    data = request.get_json() or {}
+    email = data.get("email", "").strip()
+    pwd   = hashlib.sha256(data.get("password", "").encode()).hexdigest()
+    if email == DASHBOARD_EMAIL and pwd == DASHBOARD_PASSWORD:
+        flask_session["logged_in"] = True
+        return jsonify({"status": "ok"})
+    return jsonify({"error": "Invalid email or password"}), 401
+
+
+@app.route("/api/logout", methods=["POST"])
+def api_logout():
+    flask_session.clear()
+    return jsonify({"status": "logged_out"})
+
+
+@app.route("/api/auth-status")
+def api_auth_status():
+    return jsonify({"logged_in": bool(flask_session.get("logged_in"))})
+
+
 @app.route("/api/approve/<filename>", methods=["POST"])
+@login_required
 def api_approve(filename):
     src  = PENDING_DIR / filename
     dest = APPROVED_DIR / filename
@@ -194,6 +232,7 @@ def api_approve(filename):
 
 
 @app.route("/api/reject/<filename>", methods=["POST"])
+@login_required
 def api_reject(filename):
     src  = PENDING_DIR / filename
     dest = REJECTED_DIR / filename
@@ -205,6 +244,7 @@ def api_reject(filename):
 
 
 @app.route("/api/draft/<platform>", methods=["POST"])
+@login_required
 def api_draft(platform):
     """Trigger a post scheduler to draft a post now."""
     scheduler_map = {
