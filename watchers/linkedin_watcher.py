@@ -123,7 +123,7 @@ class LinkedInPoster:
                 logger.info("Launching Chrome browser...")
                 browser = p.chromium.launch(
                     channel="chrome",
-                    headless=False,
+                    headless=(sys.platform != "win32"),
                     args=["--start-maximized"],
                 )
 

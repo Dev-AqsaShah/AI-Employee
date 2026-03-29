@@ -161,7 +161,7 @@ class InstagramPoster:
 
         with sync_playwright() as p:
             browser = p.chromium.launch(
-                headless=False,
+                headless=(sys.platform != "win32"),
                 args=[
                     "--no-sandbox",
                     "--start-maximized",
@@ -216,7 +216,7 @@ class InstagramPoster:
         try:
             with sync_playwright() as p:
                 browser = p.chromium.launch(
-                    headless=False,
+                    headless=(sys.platform != "win32"),
                     args=[
                         "--no-sandbox",
                         "--disable-dev-shm-usage",

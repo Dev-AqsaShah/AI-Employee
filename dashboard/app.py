@@ -14,6 +14,7 @@ from pathlib import Path
 from datetime import datetime
 
 from flask import Flask, render_template, jsonify, request, redirect, url_for
+import base64
 
 # ── Setup ────────────────────────────────────────────────────────────────────
 BASE_DIR   = Path(__file__).parent.parent
@@ -249,6 +250,35 @@ def api_watcher_status():
         status[w] = any(w in s for s in running_scripts)
 
     return jsonify(status)
+
+
+@app.route("/api/upload-session/<platform>", methods=["POST"])
+def api_upload_session(platform):
+    """Receive session JSON from laptop and save it on this machine."""
+    allowed = {"linkedin", "instagram", "facebook", "twitter", "whatsapp"}
+    if platform not in allowed:
+        return jsonify({"error": "Invalid platform"}), 400
+    data = request.get_json()
+    if not data or "session" not in data:
+        return jsonify({"error": "No session data"}), 400
+    session_dir = BASE_DIR / "credentials" / f"{platform}_session"
+    session_dir.mkdir(parents=True, exist_ok=True)
+    session_file = session_dir / "state.json"
+    session_file.write_text(json.dumps(data["session"]), encoding="utf-8")
+    return jsonify({"status": "saved", "platform": platform})
+
+
+@app.route("/api/sync-sessions", methods=["POST"])
+def api_sync_sessions():
+    """Sync all sessions from request body to this machine."""
+    sessions = request.get_json() or {}
+    saved = []
+    for platform, session_data in sessions.items():
+        session_dir = BASE_DIR / "credentials" / f"{platform}_session"
+        session_dir.mkdir(parents=True, exist_ok=True)
+        (session_dir / "state.json").write_text(json.dumps(session_data), encoding="utf-8")
+        saved.append(platform)
+    return jsonify({"status": "synced", "platforms": saved})
 
 
 if __name__ == "__main__":
