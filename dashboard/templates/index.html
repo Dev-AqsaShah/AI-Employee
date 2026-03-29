@@ -146,6 +146,7 @@
     .panel { display:none; animation:fadeUp 0.3s ease; }
     .panel.active { display:block; }
     @keyframes fadeUp { from{opacity:0;transform:translateY(10px);} to{opacity:1;transform:translateY(0);} }
+    @media (max-width:768px) { .approval-btns { flex-direction:column; gap:6px !important; } .approval-btns button { width:100%; } }
 
     /* Scrollbar */
     ::-webkit-scrollbar { width:4px; }
@@ -154,7 +155,7 @@
 
     /* Mobile */
     .mob-menu-btn { display:none; }
-    .mob-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:99; }
+    .mob-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.3); z-index:99; }
     .mob-overlay.open { display:block; }
     @media (max-width: 768px) {
       .sidebar { width:240px; transform:translateX(-100%); transition:transform 0.3s ease; }
@@ -391,42 +392,7 @@
     <!-- ══ PANEL: Approvals ══ -->
     <div id="panel-approvals" class="panel">
       <div id="approvals-list" class="space-y-3">
-        {% for file in pending %}
-        <div class="glass-card p-4" id="acard-{{ loop.index }}">
-          <div class="flex items-center gap-3">
-            <div class="stripe stripe-{{ file.platform }}"></div>
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center gap-2 mb-1">
-                <span class="badge badge-{{ file.platform }}">{{ file.platform }}</span>
-                <span style="font-size:11px;color:#475569;">{{ file.modified }}</span>
-              </div>
-              <p class="text-sm font-medium text-white truncate">{{ file.name }}</p>
-              {% if file.preview %}<p style="font-size:11px;color:#64748b;margin-top:3px;" class="line-clamp-2">{{ file.preview }}</p>{% endif %}
-            </div>
-            <div class="flex items-center gap-2 flex-shrink-0">
-              <button class="btn-outline" style="padding:6px 10px;" onclick="viewFile('pending','{{ file.name }}')">View</button>
-              <button class="btn-approve" onclick="approveFile('{{ file.name }}','acard-{{ loop.index }}')">Approve</button>
-              <button class="btn-reject" onclick="rejectFile('{{ file.name }}','acard-{{ loop.index }}')">Reject</button>
-            </div>
-          </div>
-        </div>
-        {% else %}
-        <div class="text-center py-20">
-          <div class="robot-float inline-block mb-4">
-            <svg width="56" height="56" viewBox="0 0 36 36" fill="none">
-              <line x1="18" y1="1" x2="18" y2="6" stroke="#818cf8" stroke-width="1.5"/>
-              <circle cx="18" cy="1" r="1.5" fill="#a78bfa"/>
-              <rect x="8" y="6" width="20" height="14" rx="4" fill="#1e1b4b" stroke="#4f46e5" stroke-width="1"/>
-              <rect x="11" y="10" width="5" height="5" rx="1.5" fill="#4ade80" class="robot-eye"/>
-              <rect x="20" y="10" width="5" height="5" rx="1.5" fill="#4ade80" class="robot-eye"/>
-              <rect x="10" y="22" width="16" height="11" rx="3" fill="#1e1b4b" stroke="#4ade80" stroke-width="1"/>
-              <circle cx="18" cy="27" r="2.5" fill="#4ade80" opacity="0.8"/>
-            </svg>
-          </div>
-          <p class="font-semibold" style="color:#94a3b8;">All approvals cleared</p>
-          <p style="font-size:12px;color:#475569;margin-top:4px;">Your AI Employee is on top of everything.</p>
-        </div>
-        {% endfor %}
+        <div style="color:#475569;font-size:13px;padding:40px 0;text-align:center;">Loading...</div>
       </div>
     </div>
 
@@ -638,7 +604,7 @@
     if (nav) nav.classList.add('active');
     document.getElementById('page-title').textContent = pageTitles[name] || name;
     document.getElementById('page-sub').textContent = pageSubs[name] || '';
-    const loaders = { approved: loadApproved, done: loadDone, inbox: loadInbox, health: loadHealth, briefings: loadBriefings, logs: loadLogs, operations: loadOpsWatchers, alerts: loadAlerts };
+    const loaders = { approvals: loadApprovals, approved: loadApproved, done: loadDone, inbox: loadInbox, health: loadHealth, briefings: loadBriefings, logs: loadLogs, operations: loadOpsWatchers, alerts: loadAlerts };
     if (loaders[name]) loaders[name]();
     // Show back button on mobile for non-overview panels
     const backBtn = document.getElementById('back-btn');
@@ -677,7 +643,7 @@
     const res = await fetch('/api/approve/' + encodeURIComponent(filename), {method:'POST'});
     const data = await res.json();
     if (data.status === 'approved') {
-      if (card) { card.style.transition='all 0.4s'; card.style.transform='translateX(60px)'; card.style.opacity='0'; setTimeout(()=>card.remove(),400); }
+      if (card) { card.style.transition='all 0.4s'; card.style.transform='translateX(60px)'; card.style.opacity='0'; setTimeout(()=>{ card.remove(); checkEmpty('approvals-list'); },400); }
       toast('Approved — watcher will post it.', 'success');
       refreshStats();
     } else {
@@ -692,12 +658,19 @@
     const res = await fetch('/api/reject/' + encodeURIComponent(filename), {method:'POST'});
     const data = await res.json();
     if (data.status === 'rejected') {
-      if (card) { card.style.transition='all 0.4s'; card.style.transform='translateX(-60px)'; card.style.opacity='0'; setTimeout(()=>card.remove(),400); }
+      if (card) { card.style.transition='all 0.4s'; card.style.transform='translateX(-60px)'; card.style.opacity='0'; setTimeout(()=>{ card.remove(); checkEmpty('approvals-list'); },400); }
       toast('Rejected.', 'info');
       refreshStats();
     } else {
       toast(data.error || 'Error', 'error');
       if (card) { card.style.opacity='1'; card.style.pointerEvents=''; }
+    }
+  }
+
+  function checkEmpty(containerId) {
+    const c = document.getElementById(containerId);
+    if (c && c.querySelectorAll('.glass-card').length === 0) {
+      c.innerHTML = `<div class="text-center py-20"><p style="color:#94a3b8;font-weight:600;">All approvals cleared</p><p style="font-size:12px;color:#475569;margin-top:4px;">Your AI Employee is on top of everything.</p></div>`;
     }
   }
 
@@ -719,8 +692,9 @@
     const data = await res.json();
     if (data.status === 'drafted') {
       if (div) div.innerHTML = `<div style="padding:12px;border-radius:10px;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);font-size:12px;color:#4ade80;">Draft created for ${platform}. Check Pending Approvals.</div>`;
-      toast('Post drafted for ' + platform, 'success');
+      toast('Post drafted for ' + platform + ' — check Approvals', 'success');
       refreshStats();
+      loadApprovals();
     } else {
       if (div) div.innerHTML = `<div style="padding:12px;border-radius:10px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);font-size:12px;color:#f87171;">${esc(data.error||data.detail||'Failed — check API credits.')}</div>`;
     }
@@ -743,6 +717,36 @@
           </div>
           <button onclick="viewFile('${folder}','${f.name.replace(/'/g,"\\'")}')
 " class="btn-outline" style="padding:5px 12px;font-size:11px;flex-shrink:0;">View</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  async function loadApprovals() {
+    const r = await fetch('/api/pending');
+    const files = await r.json();
+    const c = document.getElementById('approvals-list');
+    if (!files.length) {
+      c.innerHTML = `<div class="text-center py-20"><p style="color:#94a3b8;font-weight:600;">All approvals cleared</p><p style="font-size:12px;color:#475569;margin-top:4px;">Your AI Employee is on top of everything.</p></div>`;
+      return;
+    }
+    c.innerHTML = files.map((f, i) => `
+      <div class="glass-card p-4" id="acard-${i}" style="margin-bottom:10px;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div class="stripe stripe-${f.platform}"></div>
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+              <span class="badge badge-${f.platform}">${f.platform}</span>
+              <span style="font-size:11px;color:#475569;">${f.modified}</span>
+            </div>
+            <p style="font-size:13px;font-weight:500;color:white;" class="truncate">${esc(f.name)}</p>
+            ${f.preview ? `<p style="font-size:11px;color:#64748b;margin-top:3px;">${esc(f.preview)}</p>` : ''}
+          </div>
+          <div class="flex items-center gap-2 flex-shrink-0 approval-btns">
+            <button class="btn-outline" style="padding:6px 10px;font-size:11px;" onclick="viewFile('pending','${f.name.replace(/'/g,"\\'")}')">View</button>
+            <button class="btn-approve" onclick="approveFile('${f.name.replace(/'/g,"\\'")}','acard-${i}')">Approve</button>
+            <button class="btn-reject" onclick="rejectFile('${f.name.replace(/'/g,"\\'")}','acard-${i}')">Reject</button>
+          </div>
         </div>
       </div>
     `).join('');
@@ -894,6 +898,7 @@
 
   setInterval(refreshStats, 30000);
   initOverview();
+  loadApprovals();
 </script>
 </body>
 </html>
