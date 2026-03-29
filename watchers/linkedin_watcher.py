@@ -158,73 +158,92 @@ class LinkedInPoster:
                 logger.info("Session saved.")
 
                 # ── Create post ────────────────────────────────────────────────
-                logger.info("Opening post composer...")
-                # Already on feed — wait for page to settle instead of navigating again
+                logger.info("Going to LinkedIn feed to open post composer...")
+                page.goto("https://www.linkedin.com/feed/", timeout=60000)
+                page.wait_for_load_state("domcontentloaded")
                 time.sleep(5)
+                page.screenshot(path="debug_screenshots/li_post_new.png")
 
-                # Click "Start a post" button — try multiple selectors (LinkedIn changes these)
-                clicked = False
-                for selector in [
-                    ("role", "button", "Start a post"),
-                    ("role", "button", "Create a post"),
-                    ("css",  "button.share-box-feed-entry__trigger", None),
-                    ("css",  "div.share-box-feed-entry__trigger",    None),
-                    ("css",  "button[aria-label='Start a post']",    None),
-                    ("css",  "button[aria-label='Create a post']",   None),
-                    ("text", "Start a post",                          None),
-                    ("text", "Create a post",                         None),
+                # Click "Start a post" button in the feed share box
+                start_post_clicked = False
+                for sel in [
+                    "button.share-box-feed-entry__trigger",
+                    "button[aria-label='Start a post']",
+                    "[data-control-name='share.sharebox_trigger']",
+                    ".share-box-feed-entry__top-bar button",
+                    ".share-creation-state__trigger",
                 ]:
                     try:
-                        kind = selector[0]
-                        if kind == "role":
-                            page.get_by_role("button", name=selector[2]).first.click(timeout=6000)
-                        elif kind == "css":
-                            page.click(selector[1], timeout=6000)
-                        elif kind == "text":
-                            page.get_by_text(selector[1]).first.click(timeout=6000)
-                        clicked = True
-                        logger.info(f"Clicked post trigger via {kind}: {selector[1] or selector[2]}")
-                        break
-                    except Exception:
-                        continue
-
-                if not clicked:
-                    raise RuntimeError("Could not find 'Start a post' button — LinkedIn may have changed their UI")
-
-                time.sleep(6)
-
-                # Take screenshot to debug
-                page.screenshot(path="debug_screenshots/li_1_after_click.png")
-
-                # Type the post content — try multiple editor selectors
-                editor = None
-                for ed_sel in [
-                    "div.ql-editor",
-                    "div[role='textbox']",
-                    "div[contenteditable='true']",
-                    ".editor-content div[contenteditable]",
-                    "div[data-placeholder]",
-                    "div.share-creation-state__editor div[contenteditable='true']",
-                    ".mentions-texteditor__contenteditable",
-                    "div.editor-container div[contenteditable]",
-                    "div.share-box__container div[contenteditable='true']",
-                    "p[data-placeholder]",
-                ]:
-                    try:
-                        editor = page.wait_for_selector(ed_sel, timeout=5000)
-                        if editor:
-                            logger.info(f"Found editor with selector: {ed_sel}")
+                        btn = page.wait_for_selector(sel, timeout=5000)
+                        if btn:
+                            btn.click()
+                            logger.info(f"Clicked 'Start a post' with selector: {sel}")
+                            start_post_clicked = True
+                            time.sleep(3)
                             break
                     except Exception:
                         continue
+
+                if not start_post_clicked:
+                    # Fallback: click by visible text
+                    try:
+                        page.get_by_text("Start a post").first.click(timeout=5000)
+                        start_post_clicked = True
+                        logger.info("Clicked 'Start a post' via text search")
+                        time.sleep(3)
+                    except Exception:
+                        pass
+
+                if not start_post_clicked:
+                    page.screenshot(path="debug_screenshots/li_no_start_post.png")
+                    raise RuntimeError("Could not find 'Start a post' button")
+
+                page.screenshot(path="debug_screenshots/li_1_after_click.png")
+                time.sleep(3)
+                page.screenshot(path="debug_screenshots/li_2_after_wait.png")
+
+                # Type the post content in the modal editor
+                editor = None
+
+                # Try get_by_placeholder first (most reliable)
+                try:
+                    loc = page.get_by_placeholder("What do you want to talk about?")
+                    loc.wait_for(timeout=8000)
+                    editor = loc
+                    logger.info("Found editor via placeholder text")
+                except Exception:
+                    pass
+
+                # Fallback: any contenteditable inside the modal
+                if not editor:
+                    try:
+                        loc = page.locator("[contenteditable='true']").first
+                        loc.wait_for(timeout=5000)
+                        editor = loc
+                        logger.info("Found editor via contenteditable locator")
+                    except Exception:
+                        pass
+
+                # Last resort: JavaScript click on contenteditable
+                if not editor:
+                    try:
+                        page.evaluate("document.querySelector('[contenteditable]').click()")
+                        page.keyboard.type(content, delay=20)
+                        time.sleep(1)
+                        logger.info("Typed content via JS click fallback")
+                        editor = True  # Mark as handled
+                    except Exception:
+                        pass
 
                 if not editor:
                     page.screenshot(path="debug_screenshots/li_no_editor.png")
                     raise RuntimeError("Could not find post editor — LinkedIn may have changed their UI")
 
-                editor.click()
-                page.keyboard.type(content, delay=20)
-                time.sleep(1)
+                if editor is not True:
+                    editor.click()
+                    time.sleep(1)
+                    page.keyboard.type(content, delay=20)
+                    time.sleep(1)
 
                 # Click Post button
                 posted = False
