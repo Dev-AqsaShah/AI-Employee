@@ -84,6 +84,13 @@ def _safe_name(text: str) -> str:
 def _launch(p, headless: bool = False):
     """Launch persistent context — preserves IndexedDB for WhatsApp Web session."""
     BROWSER_DIR.mkdir(parents=True, exist_ok=True)
+    # Remove stale lockfile if exists (left by crashed process)
+    lockfile = BROWSER_DIR / "lockfile"
+    if lockfile.exists():
+        try:
+            lockfile.unlink()
+        except Exception:
+            pass
     context = p.chromium.launch_persistent_context(
         str(BROWSER_DIR),
         headless=headless,
@@ -270,18 +277,7 @@ def check_messages() -> list:
                             break
                     contact = name_el.inner_text().strip() if name_el else "Unknown"
 
-                    # Skip groups — group previews show "~ SenderName:" prefix
-                    # Also skip if chat has group icon (multiple people icon)
-                    preview_el = chat.query_selector("[data-testid='last-msg-status'] ~ span, span[dir='ltr']")
-                    preview_text = preview_el.inner_text().strip() if preview_el else ""
-                    is_group = (
-                        preview_text.startswith("~") or          # group message prefix
-                        re.search(r"^\+?\d{10,}", preview_text) or  # phone number prefix
-                        chat.query_selector("[data-testid='group']") is not None
-                    )
-                    if is_group:
-                        logger.info(f"Skipping group: {contact}")
-                        continue
+                    # Groups allowed — don't skip them
 
                     chat_id = f"wa_{_safe_name(contact)}_{datetime.now().strftime('%Y%m%d')}"
                     if chat_id in seen_ids:
@@ -294,13 +290,35 @@ def check_messages() -> list:
                     chat_texts = []
                     for m in msg_els[-10:]:
                         try:
-                            t = m.query_selector("[data-testid='msg-text'], .copyable-text span")
-                            if t:
-                                txt = t.inner_text().strip()
-                                if txt:
-                                    chat_texts.append(txt)
+                            # Try multiple selectors for message text
+                            txt = ""
+                            for txt_sel in [
+                                "[data-testid='msg-text']",
+                                ".selectable-text span[class*='selectable']",
+                                ".selectable-text",
+                                "span.copyable-text",
+                                ".copyable-text span",
+                                "span[dir='ltr']",
+                                "span[dir='rtl']",
+                            ]:
+                                t = m.query_selector(txt_sel)
+                                if t:
+                                    txt = t.inner_text().strip()
+                                    if txt:
+                                        break
+                            if txt:
+                                chat_texts.append(txt)
                         except Exception:
                             pass
+                    # Fallback: get all visible text from last 5 message elements
+                    if not chat_texts and msg_els:
+                        for m in msg_els[-5:]:
+                            try:
+                                txt = m.inner_text().strip()
+                                if txt and len(txt) > 2:
+                                    chat_texts.append(txt[:300])
+                            except Exception:
+                                pass
 
                     messages.append({"contact": contact, "messages": chat_texts, "chat_id": chat_id})
                     seen_ids.add(chat_id)
@@ -473,14 +491,27 @@ def send_reply(contact: str, message: str) -> dict:
             time.sleep(2)
 
             # Search for contact
-            search = page.wait_for_selector(
-                "[data-testid='chat-list-search'], [aria-label='Search input textbox']",
-                timeout=10000,
-            )
+            search = None
+            for s_sel in [
+                "[data-testid='chat-list-search']",
+                "[aria-label='Search input textbox']",
+                "[aria-label='Search or start new chat']",
+                "div[contenteditable='true'][data-tab='3']",
+                "#side div[contenteditable='true']",
+            ]:
+                try:
+                    search = page.wait_for_selector(s_sel, timeout=5000)
+                    if search and search.is_visible():
+                        break
+                except Exception:
+                    continue
+            if not search:
+                context.close()
+                return {"status": "error", "message": "Could not find search box"}
             search.click()
             time.sleep(1)
             page.keyboard.type(contact, delay=80)
-            time.sleep(2)
+            time.sleep(3)
 
             page.screenshot(path=str(debug_dir / "wa_2_search.png"))
 
