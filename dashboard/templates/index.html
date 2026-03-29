@@ -670,6 +670,7 @@
 
   // ── Approve / Reject ──
   async function approveFile(filename, cardId) {
+    if (!isLoggedIn) { showLoginModal(() => approveFile(filename, cardId)); return; }
     const card = document.getElementById(cardId);
     if (card) { card.style.opacity = '0.4'; card.style.pointerEvents = 'none'; }
     const res = await fetch('/api/approve/' + encodeURIComponent(filename), {method:'POST'});
@@ -685,6 +686,7 @@
   }
 
   async function rejectFile(filename, cardId) {
+    if (!isLoggedIn) { showLoginModal(() => rejectFile(filename, cardId)); return; }
     const card = document.getElementById(cardId);
     if (card) { card.style.opacity='0.4'; card.style.pointerEvents='none'; }
     const res = await fetch('/api/reject/' + encodeURIComponent(filename), {method:'POST'});
@@ -718,6 +720,7 @@
 
   // ── Draft Post ──
   async function draftPost(platform, resultId='draft-result') {
+    if (!isLoggedIn) { showLoginModal(() => draftPost(platform, resultId)); return; }
     const div = document.getElementById(resultId);
     if (div) { div.classList.remove('hidden'); div.innerHTML = `<div style="padding:12px;border-radius:10px;background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.15);font-size:12px;color:#818cf8;">Drafting ${platform} post with AI...</div>`; }
     const res = await fetch('/api/draft/'+platform, {method:'POST'});
@@ -987,14 +990,6 @@
     else { showLoginModal(action); }
   }
 
-  // ── Override approve/reject/draft to require auth ──
-  const _approveFile = approveFile;
-  const _rejectFile  = rejectFile;
-  const _draftPost   = draftPost;
-
-  window.approveFile = (filename, cardId) => requireAuth(() => _approveFile(filename, cardId));
-  window.rejectFile  = (filename, cardId) => requireAuth(() => _rejectFile(filename, cardId));
-  window.draftPost   = (platform, resultId) => requireAuth(() => _draftPost(platform, resultId));
 
   setInterval(refreshStats, 30000);
   initOverview();
