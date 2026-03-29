@@ -153,11 +153,16 @@
     ::-webkit-scrollbar-thumb { background:#1e293b; border-radius:2px; }
 
     /* Mobile */
+    .mob-menu-btn { display:none; }
+    .mob-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:99; }
+    .mob-overlay.open { display:block; }
     @media (max-width: 768px) {
-      .sidebar { width:200px; transform:translateX(-100%); transition:transform 0.3s; }
-      .sidebar.open { transform:translateX(0); }
-      .main-content { margin-left:0; padding:16px; }
+      .sidebar { width:240px; transform:translateX(-100%); transition:transform 0.3s ease; }
+      .sidebar.open { transform:translateX(0); box-shadow:0 0 40px rgba(0,0,0,0.6); }
+      .main-content { margin-left:0; padding:14px; }
       .mob-menu-btn { display:flex !important; }
+      .back-btn { display:flex !important; }
+      .grid.lg\:grid-cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
 
     /* Toast */
@@ -272,14 +277,24 @@
 
     <!-- Top bar -->
     <div class="topbar">
-      <div>
-        <h2 class="text-xl font-bold text-white" id="page-title">Overview</h2>
-        <p class="text-xs text-slate-500 mt-0.5" id="page-sub">Real-time AI Employee status</p>
+      <div class="flex items-center gap-3">
+        <!-- Hamburger (mobile only) -->
+        <button class="mob-menu-btn btn-outline" onclick="toggleSidebar()" style="padding:8px 10px;">
+          <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <!-- Back button (mobile only, hidden on overview) -->
+        <button id="back-btn" class="back-btn btn-outline" onclick="showPanel('overview')" style="display:none;padding:8px 10px;">
+          <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+        </button>
+        <div>
+          <h2 class="text-xl font-bold text-white" id="page-title">Overview</h2>
+          <p class="text-xs text-slate-500 mt-0.5" id="page-sub">Real-time AI Employee status</p>
+        </div>
       </div>
       <div class="flex items-center gap-2">
         <button onclick="refreshAll()" class="btn-outline flex items-center gap-2">
           <svg id="refreshIcon" xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-          Refresh
+          <span class="hidden sm:inline">Refresh</span>
         </button>
       </div>
     </div>
@@ -592,6 +607,9 @@
   </div>
 </div>
 
+<!-- ══ Mobile overlay ══ -->
+<div class="mob-overlay" id="mob-overlay" onclick="toggleSidebar()"></div>
+
 <!-- ══ Toast ══ -->
 <div id="toast"></div>
 
@@ -622,6 +640,23 @@
     document.getElementById('page-sub').textContent = pageSubs[name] || '';
     const loaders = { approved: loadApproved, done: loadDone, inbox: loadInbox, health: loadHealth, briefings: loadBriefings, logs: loadLogs, operations: loadOpsWatchers, alerts: loadAlerts };
     if (loaders[name]) loaders[name]();
+    // Show back button on mobile for non-overview panels
+    const backBtn = document.getElementById('back-btn');
+    if (backBtn) backBtn.style.display = (name !== 'overview' && window.innerWidth <= 768) ? 'flex' : 'none';
+    // Close sidebar on mobile after nav
+    if (window.innerWidth <= 768) closeSidebar();
+  }
+
+  function toggleSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('mob-overlay');
+    sidebar.classList.toggle('open');
+    overlay.classList.toggle('open');
+  }
+
+  function closeSidebar() {
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('mob-overlay').classList.remove('open');
   }
 
   // ── Toast ──
