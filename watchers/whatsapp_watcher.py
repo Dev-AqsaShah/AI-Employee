@@ -451,13 +451,17 @@ def _ai_draft_reply(contact: str, messages: list) -> str:
             messages=[{
                 "role": "user",
                 "content": (
-                    f"You are drafting a WhatsApp reply on behalf of Aqsa.\n\n"
-                    f"Contact name: {contact}\n"
-                    f"Their recent messages:\n{msgs_text}\n\n"
-                    f"Write a short, friendly, natural WhatsApp reply that directly responds to what they said. "
-                    f"If they asked a question, answer it. If they shared something, respond to that specifically. "
-                    f"Keep it 1-3 sentences max. No markdown, no formatting — plain conversational text only. "
-                    f"Sound like a real person, not a bot."
+                    f"You are Aqsa. Write a WhatsApp reply AS Aqsa — in first person, her own voice.\n\n"
+                    f"The person you are replying to: {contact}\n"
+                    f"Their message(s):\n{msgs_text}\n\n"
+                    f"Rules:\n"
+                    f"- Write AS Aqsa, not as an AI or assistant\n"
+                    f"- VERY IMPORTANT: If their message is in Roman Urdu, reply in Roman Urdu. If English, reply in English. Match their language exactly.\n"
+                    f"- Reply directly to what they said — answer questions, respond to what they shared\n"
+                    f"- Keep it short: 1-3 sentences like a real WhatsApp chat\n"
+                    f"- No markdown, no formatting, plain text only\n"
+                    f"- Sound natural and friendly, like texting a friend\n"
+                    f"- Never say 'How can I help you' or sound like a bot or assistant"
                 ),
             }],
         )
