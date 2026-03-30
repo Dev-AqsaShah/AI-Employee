@@ -245,6 +245,10 @@
       <a class="nav-item" onclick="showPanel('done')" id="nav-done">
         <span class="nav-icon">◎</span> Done
       </a>
+      <a class="nav-item" onclick="showPanel('whatsapp')" id="nav-whatsapp">
+        <span class="nav-icon">💬</span> WhatsApp
+        <span class="nav-badge green" id="nb-whatsapp" style="display:none"></span>
+      </a>
       <a class="nav-item" onclick="showPanel('inbox')" id="nav-inbox">
         <span class="nav-icon">◻</span> Inbox
         <span class="nav-badge green" id="nb-inbox">{{ stats.inbox }}</span>
@@ -519,6 +523,24 @@
       <div id="done-list" class="space-y-3"><div style="color:#475569;font-size:13px;padding:40px 0;text-align:center;">Loading...</div></div>
     </div>
 
+    <!-- ══ PANEL: WhatsApp ══ -->
+    <div id="panel-whatsapp" class="panel">
+      <div class="flex items-center justify-between mb-5">
+        <h2 class="text-lg font-semibold text-white">💬 WhatsApp</h2>
+        <button onclick="loadWhatsApp()" class="btn-outline" style="padding:6px 14px;font-size:12px;">↻ Refresh</button>
+      </div>
+      <!-- Pending Drafts -->
+      <div class="mb-6">
+        <h3 style="font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:12px;">Pending Reply Drafts</h3>
+        <div id="wa-drafts-list"></div>
+      </div>
+      <!-- Incoming Messages -->
+      <div>
+        <h3 style="font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:12px;">Incoming Messages</h3>
+        <div id="wa-messages-list"></div>
+      </div>
+    </div>
+
     <!-- ══ PANEL: Inbox ══ -->
     <div id="panel-inbox" class="panel">
       <div id="inbox-list" class="space-y-3"><div style="color:#475569;font-size:13px;padding:40px 0;text-align:center;">Loading...</div></div>
@@ -624,7 +646,7 @@
     draft:'AI-powered content drafting', approved:'Posts approved and queued for publishing',
     done:'Successfully published posts', inbox:'Incoming messages and notifications',
     health:'Active watchers and system components', briefings:'Weekly executive reports',
-    logs:'Detailed activity and audit trail'
+    logs:'Detailed activity and audit trail', whatsapp:'WhatsApp messages and AI reply drafts'
   };
 
   function showPanel(name) {
@@ -636,7 +658,7 @@
     if (nav) nav.classList.add('active');
     document.getElementById('page-title').textContent = pageTitles[name] || name;
     document.getElementById('page-sub').textContent = pageSubs[name] || '';
-    const loaders = { approvals: loadApprovals, approved: loadApproved, done: loadDone, inbox: loadInbox, health: loadHealth, briefings: loadBriefings, logs: loadLogs, operations: loadOpsWatchers, alerts: loadAlerts };
+    const loaders = { approvals: loadApprovals, approved: loadApproved, done: loadDone, inbox: loadInbox, health: loadHealth, briefings: loadBriefings, logs: loadLogs, operations: loadOpsWatchers, alerts: loadAlerts, whatsapp: loadWhatsApp };
     if (loaders[name]) loaders[name]();
     // Show back button on mobile for non-overview panels
     const backBtn = document.getElementById('back-btn');
@@ -755,6 +777,85 @@
         </div>
       </div>
     `).join('');
+  }
+
+  async function loadWhatsApp() {
+    // Load drafts
+    const dr = await fetch('/api/whatsapp/drafts');
+    const drafts = await dr.json();
+    const dList = document.getElementById('wa-drafts-list');
+    const badge = document.getElementById('nb-whatsapp');
+    if (drafts.length === 0) {
+      dList.innerHTML = '<div style="color:#475569;font-size:13px;padding:20px 0;text-align:center;">No pending drafts</div>';
+      badge.style.display = 'none';
+    } else {
+      badge.textContent = drafts.length;
+      badge.style.display = '';
+      dList.innerHTML = drafts.map(d => `
+        <div class="glass-card p-4 mb-3" id="wa-draft-${d.name.replace(/\./g,'_')}">
+          <div class="flex items-center justify-between mb-2">
+            <div style="font-weight:600;color:#a5b4fc;font-size:13px;">💬 ${d.contact}</div>
+            <div style="font-size:11px;color:#475569;">${d.modified}</div>
+          </div>
+          ${d.original.length ? `<div style="font-size:12px;color:#64748b;margin-bottom:8px;padding:8px;background:rgba(0,0,0,0.2);border-radius:8px;border-left:3px solid #475569;">
+            <div style="font-size:10px;color:#475569;margin-bottom:4px;">Their message:</div>
+            ${d.original.map(m=>`<div>${m}</div>`).join('')}
+          </div>` : ''}
+          <div style="font-size:12px;color:#64748b;margin-bottom:4px;font-weight:600;">AI Draft Reply:</div>
+          <textarea id="wa-reply-${d.name.replace(/\./g,'_')}" style="width:100%;background:rgba(10,15,35,0.8);border:1px solid rgba(99,102,241,0.2);border-radius:8px;padding:10px;color:white;font-size:13px;resize:vertical;min-height:80px;outline:none;box-sizing:border-box;">${d.reply}</textarea>
+          <div class="flex gap-2 mt-3">
+            <button onclick="waApprove('${d.name}')" style="flex:1;padding:8px;background:rgba(34,197,94,0.15);border:1px solid rgba(34,197,94,0.3);border-radius:8px;color:#4ade80;font-size:12px;font-weight:600;cursor:pointer;">✓ Approve & Send</button>
+            <button onclick="waReject('${d.name}')" style="padding:8px 16px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);border-radius:8px;color:#f87171;font-size:12px;cursor:pointer;">✕ Reject</button>
+          </div>
+        </div>`).join('');
+    }
+    // Load messages
+    const mr = await fetch('/api/whatsapp/messages');
+    const msgs = await mr.json();
+    const mList = document.getElementById('wa-messages-list');
+    if (msgs.length === 0) {
+      mList.innerHTML = '<div style="color:#475569;font-size:13px;padding:20px 0;text-align:center;">No messages in inbox</div>';
+    } else {
+      mList.innerHTML = msgs.slice(0,10).map(m => `
+        <div class="glass-card p-4 mb-3">
+          <div class="flex items-center justify-between mb-2">
+            <div style="font-weight:600;color:#e2e8f0;font-size:13px;">📩 ${m.contact}</div>
+            <div style="font-size:11px;color:#475569;">${m.modified}</div>
+          </div>
+          ${m.messages.length ? m.messages.map(t=>`<div style="font-size:13px;color:#94a3b8;padding:4px 0;">${t}</div>`).join('') : '<div style="font-size:12px;color:#475569;">No text captured</div>'}
+        </div>`).join('');
+    }
+  }
+
+  async function waApprove(filename) {
+    if (!isLoggedIn) { showLoginModal(() => waApprove(filename)); return; }
+    const key = filename.replace(/\./g,'_');
+    const replyEl = document.getElementById('wa-reply-' + key);
+    const reply = replyEl ? replyEl.value.trim() : '';
+    const res = await fetch('/api/whatsapp/approve/' + filename, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({reply})
+    });
+    const data = await res.json();
+    if (data.status === 'approved') {
+      document.getElementById('wa-draft-' + key)?.remove();
+      toast('Reply approved — sending via watcher', 'success');
+      loadWhatsApp();
+    } else {
+      toast(data.error || 'Error', 'error');
+    }
+  }
+
+  async function waReject(filename) {
+    if (!isLoggedIn) { showLoginModal(() => waReject(filename)); return; }
+    const res = await fetch('/api/whatsapp/reject/' + filename, {method:'POST'});
+    const data = await res.json();
+    if (data.status === 'rejected') {
+      const key = filename.replace(/\./g,'_');
+      document.getElementById('wa-draft-' + key)?.remove();
+      toast('Draft rejected', 'error');
+      loadWhatsApp();
+    }
   }
 
   async function loadApprovals() {

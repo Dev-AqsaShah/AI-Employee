@@ -163,6 +163,89 @@ def api_inbox():
     return jsonify(get_files(INBOX_DIR))
 
 
+@app.route("/api/whatsapp/messages")
+def api_whatsapp_messages():
+    """Incoming WhatsApp messages from Inbox."""
+    files = []
+    for f in sorted(INBOX_DIR.glob("WHATSAPP_*.md"), key=lambda x: x.stat().st_mtime, reverse=True):
+        content = f.read_text(encoding="utf-8", errors="ignore")
+        contact = ""
+        lines_text = []
+        for line in content.splitlines():
+            if line.startswith("contact:"):
+                contact = line.replace("contact:", "").strip()
+            if line.startswith("- ") and "(no text)" not in line:
+                lines_text.append(line[2:].strip())
+        files.append({
+            "name": f.name,
+            "contact": contact,
+            "messages": lines_text,
+            "modified": datetime.fromtimestamp(f.stat().st_mtime).strftime("%Y-%m-%d %H:%M"),
+        })
+    return jsonify(files)
+
+
+@app.route("/api/whatsapp/drafts")
+def api_whatsapp_drafts():
+    """Pending WhatsApp reply drafts."""
+    files = []
+    for f in sorted(PENDING_DIR.glob("WHATSAPP_REPLY_*.md"), key=lambda x: x.stat().st_mtime, reverse=True):
+        content = f.read_text(encoding="utf-8", errors="ignore")
+        contact = ""
+        reply = ""
+        original = []
+        import re as _re
+        m = _re.search(r"^contact:\s*(.+)$", content, _re.MULTILINE)
+        if m:
+            contact = m.group(1).strip()
+        m2 = _re.search(r"## Reply Content\s*\n(.*?)(?:\n---|\Z)", content, _re.DOTALL)
+        if m2:
+            reply = m2.group(1).strip()
+        for line in content.splitlines():
+            if line.startswith("- ") and "(no text)" not in line:
+                original.append(line[2:].strip())
+        files.append({
+            "name": f.name,
+            "contact": contact,
+            "original": original,
+            "reply": reply,
+            "modified": datetime.fromtimestamp(f.stat().st_mtime).strftime("%Y-%m-%d %H:%M"),
+        })
+    return jsonify(files)
+
+
+@app.route("/api/whatsapp/approve/<filename>", methods=["POST"])
+@login_required
+def api_whatsapp_approve(filename):
+    """Move WhatsApp reply draft to Approved."""
+    src = PENDING_DIR / filename
+    if not src.exists():
+        return jsonify({"error": "File not found"}), 404
+    # Allow editing reply content before approving
+    data = request.get_json() or {}
+    if "reply" in data:
+        content = src.read_text(encoding="utf-8")
+        import re as _re
+        content = _re.sub(
+            r"(## Reply Content\s*\n)(.*?)(\n---|\Z)",
+            lambda m: m.group(1) + data["reply"] + m.group(3),
+            content, flags=_re.DOTALL
+        )
+        src.write_text(content, encoding="utf-8")
+    shutil.move(str(src), str(APPROVED_DIR / filename))
+    return jsonify({"status": "approved", "file": filename})
+
+
+@app.route("/api/whatsapp/reject/<filename>", methods=["POST"])
+@login_required
+def api_whatsapp_reject(filename):
+    """Reject a WhatsApp draft."""
+    src = PENDING_DIR / filename
+    if src.exists():
+        shutil.move(str(src), str(REJECTED_DIR / filename))
+    return jsonify({"status": "rejected"})
+
+
 @app.route("/api/needs")
 def api_needs():
     return jsonify(get_files(NEEDS_DIR))

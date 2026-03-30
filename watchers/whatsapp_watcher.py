@@ -94,14 +94,13 @@ def _launch(p, headless: bool = False):
                 pass
     context = p.chromium.launch_persistent_context(
         str(BROWSER_DIR),
-        channel="chrome",   # Use system Chrome — more stable than Playwright's Chromium
         headless=False,
         args=[
             "--no-sandbox",
             "--disable-dev-shm-usage",
             "--disable-blink-features=AutomationControlled",
-            "--window-position=-32000,-32000",
-            "--window-size=1280,900",
+            "--window-size=1,1",
+            "--window-position=0,0",
         ],
         viewport={"width": 1280, "height": 900},
         user_agent=(
