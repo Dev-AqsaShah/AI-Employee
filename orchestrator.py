@@ -68,7 +68,10 @@ def log_event(event_type: str, details: str):
 # ── Process Manager ────────────────────────────────────────────────────────────
 
 class ManagedProcess:
-    """A subprocess that auto-restarts on crash."""
+    """A subprocess that auto-restarts on crash with exponential backoff."""
+
+    MAX_BACKOFF = 300   # 5 minutes max wait between restarts
+    MAX_RESTARTS = 20   # stop restarting after this many consecutive failures
 
     def __init__(self, name: str, cmd: list, enabled: bool = True):
         self.name    = name
@@ -76,6 +79,7 @@ class ManagedProcess:
         self.enabled = enabled
         self.proc: Optional[subprocess.Popen] = None
         self.restart_count = 0
+        self._next_restart_at: float = 0.0   # epoch seconds
 
     def start(self):
         if not self.enabled:
@@ -94,10 +98,24 @@ class ManagedProcess:
     def is_running(self) -> bool:
         return self.proc is not None and self.proc.poll() is None
 
+    def needs_restart(self) -> bool:
+        """True if crashed and backoff period has elapsed."""
+        if not self.enabled or self.is_running():
+            return False
+        if self.restart_count >= self.MAX_RESTARTS:
+            return False
+        return time.time() >= self._next_restart_at
+
     def restart(self):
         self.restart_count += 1
-        logger.warning(f"Restarting {self.name} (restart #{self.restart_count})")
-        log_event("PROCESS_RESTART", f"{self.name} restart_count={self.restart_count}")
+        # Exponential backoff: 30s, 60s, 120s … capped at MAX_BACKOFF
+        backoff = min(30 * (2 ** (self.restart_count - 1)), self.MAX_BACKOFF)
+        self._next_restart_at = time.time() + backoff
+        logger.warning(
+            f"Restarting {self.name} (restart #{self.restart_count}, "
+            f"next in {backoff}s if it crashes again)"
+        )
+        log_event("PROCESS_RESTART", f"{self.name} restart_count={self.restart_count} backoff={backoff}s")
         self.start()
 
     def stop(self):
@@ -385,11 +403,13 @@ class Orchestrator:
                 logger.warning("STOP.md detected — halting all processes.")
                 self.stop()
 
-            # Health check + restart crashed processes
+            # Health check + restart crashed processes (with backoff)
             for proc in self.processes:
-                if proc.enabled and not proc.is_running():
+                if proc.needs_restart():
                     proc.restart()
                     time.sleep(2)
+                elif proc.enabled and proc.restart_count >= ManagedProcess.MAX_RESTARTS and not proc.is_running():
+                    logger.error(f"{proc.name}: exceeded max restarts ({ManagedProcess.MAX_RESTARTS}) — giving up")
 
             time.sleep(10)
 
