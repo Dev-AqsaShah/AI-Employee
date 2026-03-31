@@ -219,6 +219,10 @@
     <!-- Nav -->
     <nav class="flex-1 overflow-y-auto py-2">
 
+      <a class="nav-item" href="/chat" style="margin-bottom:12px;background:linear-gradient(135deg,rgba(139,92,246,0.25),rgba(99,102,241,0.15));border:1px solid rgba(139,92,246,0.4);color:#c4b5fd;font-weight:600;">
+        <span class="nav-icon">✦</span> Aria
+      </a>
+
       <div class="nav-section-label">Operations</div>
       <a class="nav-item active" onclick="showPanel('overview')" id="nav-overview">
         <span class="nav-icon">▦</span> Overview
@@ -264,6 +268,7 @@
       <a class="nav-item" onclick="showPanel('logs')" id="nav-logs">
         <span class="nav-icon">≡</span> Raw Logs
       </a>
+
 
     </nav>
 
@@ -762,7 +767,7 @@
     const c = document.getElementById(containerId);
     if (!files.length) { c.innerHTML = `<div style="text-align:center;padding:60px 0;color:#475569;font-size:13px;">No items here.</div>`; return; }
     c.innerHTML = files.map(f => `
-      <div class="glass-card p-4" style="margin-bottom:10px;">
+      <div class="glass-card p-4" id="icard-${f.name.replace(/[^a-z0-9]/gi,'_')}" style="margin-bottom:10px;">
         <div style="display:flex;align-items:center;gap:12px;">
           <div class="stripe stripe-${f.platform}"></div>
           <div style="flex:1;min-width:0;">
@@ -772,11 +777,25 @@
             </div>
             <p style="font-size:13px;color:#cbd5e1;" class="truncate">${esc(f.name)}</p>
           </div>
-          <button onclick="viewFile('${folder}','${f.name.replace(/'/g,"\\'")}')
-" class="btn-outline" style="padding:5px 12px;font-size:11px;flex-shrink:0;">View</button>
+          <div style="display:flex;gap:6px;flex-shrink:0;">
+            <button onclick="viewFile('${folder}','${f.name.replace(/'/g,"\\'")}') " class="btn-outline" style="padding:5px 12px;font-size:11px;">View</button>
+            ${folder === 'inbox' ? `<button onclick="deleteInboxFile('${f.name.replace(/'/g,"\\'")}','${f.name.replace(/[^a-z0-9]/gi,'_')}')" style="padding:5px 10px;font-size:11px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);border-radius:9px;color:#f87171;cursor:pointer;">✕</button>` : ''}
+          </div>
         </div>
       </div>
     `).join('');
+  }
+
+  async function deleteInboxFile(filename, cardId) {
+    const res = await fetch('/api/inbox/' + encodeURIComponent(filename), {method:'DELETE'});
+    const data = await res.json();
+    if (data.status === 'deleted') {
+      document.getElementById('icard-' + cardId)?.remove();
+      toast('Deleted', 'error');
+      loadInbox();
+    } else {
+      toast(data.error || 'Error deleting file', 'error');
+    }
   }
 
   async function loadWhatsApp() {
@@ -930,24 +949,40 @@
     `;
   }
 
+  const _dismissedAlerts = new Set(JSON.parse(localStorage.getItem('dismissedAlerts') || '[]'));
+  function _saveDismissed() { localStorage.setItem('dismissedAlerts', JSON.stringify([..._dismissedAlerts])); }
+  function dismissAlert(key) {
+    _dismissedAlerts.add(key);
+    _saveDismissed();
+    loadAlerts();
+  }
+
   async function loadAlerts() {
     const res = await fetch('/api/stats');
     const stats = await res.json();
-    const alerts = [];
-    if (stats.pending > 0) alerts.push({level:'medium', title:`${stats.pending} posts awaiting approval`, detail:'Review and approve posts in Pending Approvals to publish them.', action:"showPanel('approvals')"});
-    if (stats.needs_action > 0) alerts.push({level:'high', title:`${stats.needs_action} items need immediate action`, detail:'Check Needs Action folder for urgent tasks.', action:"showPanel('inbox')"});
-    if (stats.inbox > 0) alerts.push({level:'info', title:`${stats.inbox} new messages in Inbox`, detail:'New emails or WhatsApp messages detected.', action:"showPanel('inbox')"});
+    const allAlerts = [];
+    if (stats.pending > 0) allAlerts.push({key:`pending-${stats.pending}`, level:'medium', title:`${stats.pending} posts awaiting approval`, detail:'Review and approve posts in Pending Approvals to publish them.', action:"showPanel('approvals')"});
+    if (stats.needs_action > 0) allAlerts.push({key:`needs-${stats.needs_action}`, level:'high', title:`${stats.needs_action} items need immediate action`, detail:'Check Needs Action folder for urgent tasks.', action:"showPanel('inbox')"});
+    if (stats.inbox > 0) allAlerts.push({key:`inbox-${stats.inbox}`, level:'info', title:`${stats.inbox} new messages in Inbox`, detail:'New emails or WhatsApp messages detected.', action:"showPanel('inbox')"});
+    // Auto-clear dismissed keys that no longer match current stats
+    const currentKeys = new Set(allAlerts.map(a=>a.key));
+    for (const k of [..._dismissedAlerts]) { if (!currentKeys.has(k)) _dismissedAlerts.delete(k); }
+    _saveDismissed();
+    const alerts = allAlerts.filter(a => !_dismissedAlerts.has(a.key));
     document.getElementById('nb-alerts').textContent = alerts.filter(a=>a.level==='high').length;
     const c = document.getElementById('alerts-content');
     if (!alerts.length) { c.innerHTML = `<div style="text-align:center;padding:60px;color:#475569;font-size:13px;">No critical alerts at this time.</div>`; return; }
     c.innerHTML = `<div style="display:flex;flex-direction:column;gap:12px;">` + alerts.map(a=>`
       <div class="alert-card alert-${a.level}">
-        <div style="display:flex;items-align:center;justify-content:space-between;gap:12px;">
-          <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+          <div style="flex:1;min-width:0;">
             <p style="font-weight:600;font-size:13px;color:${a.level==='high'?'#f87171':a.level==='medium'?'#fbbf24':'#818cf8'};">${esc(a.title)}</p>
             <p style="font-size:12px;color:#64748b;margin-top:4px;">${esc(a.detail)}</p>
           </div>
-          <button onclick="${a.action}" class="btn-outline" style="padding:5px 12px;font-size:11px;flex-shrink:0;">View</button>
+          <div style="display:flex;gap:6px;flex-shrink:0;">
+            <button onclick="${a.action}" class="btn-outline" style="padding:5px 12px;font-size:11px;">View</button>
+            <button onclick="dismissAlert('${a.key}')" title="Dismiss" style="padding:5px 10px;font-size:11px;background:rgba(100,116,139,0.1);border:1px solid rgba(100,116,139,0.2);border-radius:9px;color:#64748b;cursor:pointer;">✕</button>
+          </div>
         </div>
       </div>
     `).join('') + '</div>';

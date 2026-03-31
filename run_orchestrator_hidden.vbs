@@ -14,8 +14,17 @@ logFile = baseDir & "\AI_Employee_Vault\Logs\orchestrator_stdout.log"
 
 ' ── Run silently ─────────────────────────────────────────────────────────────
 ' WindowStyle 0 = hidden, bWaitOnReturn False = don't block
+
+' Start orchestrator (all watchers)
 cmd = "cmd /c cd /d """ & baseDir & """ && """ & python & """ orchestrator.py >> """ & logFile & """ 2>&1"
 WshShell.Run cmd, 0, False
+
+' Start dashboard (Flask on port 5000)
+Dim dashLog
+dashLog = baseDir & "\AI_Employee_Vault\Logs\dashboard_stdout.log"
+Dim dashCmd
+dashCmd = "cmd /c cd /d """ & baseDir & """ && """ & python & """ dashboard\app.py >> """ & dashLog & """ 2>&1"
+WshShell.Run dashCmd, 0, False
 
 Set WshShell = Nothing
 Set fso      = Nothing

@@ -149,7 +149,8 @@ class DailyScheduler(threading.Thread):
             now = datetime.now()
             today = now.date()
 
-            if now.hour == BRIEFING_HOUR and self._last_run != today:
+            # Catch-up: if we started after 8 AM and haven't run today yet, run immediately
+            if now.hour >= BRIEFING_HOUR and self._last_run != today:
                 self._run_briefing()
                 self._last_run = today
 

@@ -4,21 +4,17 @@
     "type": "split",
     "children": [
       {
-        "id": "e2f6a5dd6c7f2e91",
+        "id": "d064cef5f755ae57",
         "type": "tabs",
         "children": [
           {
-            "id": "2f206dff75aa7609",
+            "id": "f526c6d551aee229",
             "type": "leaf",
             "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Approved/WHATSAPP_REPLY_2026-03-29_Mine.md",
-                "mode": "source",
-                "source": false
-              },
+              "type": "empty",
+              "state": {},
               "icon": "lucide-file",
-              "title": "WHATSAPP_REPLY_2026-03-29_Mine"
+              "title": "New tab"
             }
           }
         ]
@@ -183,43 +179,43 @@
       "bases:Create new base": false
     }
   },
-  "active": "e02a9e565658ebc5",
+  "active": "f526c6d551aee229",
   "lastOpenFiles": [
-    "Pending_Approval/WHATSAPP_REPLY_2026-03-29_GIAIC_03_AI_Spec-Driven_Online_Hackathon.md",
-    "Inbox/WHATSAPP_20260329_215642_GIAIC_03_AI_Spec-Driven_Online_Hackathon.md",
-    "Pending_Approval/WHATSAPP_REPLY_2026-03-29_Mine.md",
-    "Inbox/WHATSAPP_20260329_215639_Mine.md",
-    "Pending_Approval/WHATSAPP_REPLY_2026-03-29_B__S_Computer_science_girls_group.md",
-    "Approved/WHATSAPP_REPLY_2026-03-29_Mine.md",
-    "Inbox/WHATSAPP_20260329_214448_Mine.md",
-    "Inbox/WHATSAPP_20260329_214221_B__S_Computer_science_girls_group.md",
-    "Pending_Approval/LINKEDIN_2026-03-29.md",
-    "Done/INSTAGRAM_2026-03-29.md",
-    "Approved/FACEBOOK_2026-03-29.md",
-    "Approved/INSTAGRAM_2026-03-29.md",
-    "Pending_Approval/INSTAGRAM_2026-03-29.md",
-    "Pending_Approval/FACEBOOK_2026-03-29.md",
-    "Approved/INSTAGRAM_2026-03-29_silver.md",
-    "Done/INSTAGRAM_2026-03-29_silver.md",
-    "Rejected/WHATSAPP_REPLY_2026-03-29_GIAIC_03_AI_Spec-Driven_Online_Hackathon.md",
-    "Approved/LINKEDIN_2026-03-29_silver.md",
-    "Pending_Approval/LINKEDIN_2026-03-29_silver.md",
-    "Done/DRAFT_EMAIL_platinum_demo.md",
-    "Approved/DRAFT_EMAIL_platinum_demo.md",
-    "Approved/EMAIL_REPLY_platinum_demo.md",
-    "Pending_Approval/EMAIL_REPLY_platinum_demo.md",
-    "Inbox/WHATSAPP_20260329_135527_GIAIC_03_AI_Spec-Driven_Online_Hackathon.md",
-    "Done/FACEBOOK_2026-03-29.md",
-    "Rejected/WHATSAPP_REPLY_2026-03-28_GIAIC_03_AI_Spec-Driven_Online_Hackathon.md",
+    "Done/LINKEDIN_2026-03-30.md",
+    "Done/FACEBOOK_2026-03-30.md",
+    "Pending_Approval/WHATSAPP_REPLY_2026-03-31_GIAIC_03_AI_Spec-Driven_Online_Hackathon.md",
+    "Inbox/WHATSAPP_20260331_142214_GIAIC_03_AI_Spec-Driven_Online_Hackathon.md",
+    "Rejected/WHATSAPP_REPLY_2026-03-31_B__S_Computer_science_girls_group.md",
+    "Inbox/WHATSAPP_20260331_120219_GIAIC_03_AI_Spec-Driven_Online_Hackathon.md",
+    "Inbox/WHATSAPP_20260331_120045_B__S_Computer_science_girls_group.md",
+    "Approved/INSTAGRAM_2026-03-31.md",
+    "Pending_Approval/INSTAGRAM_2026-03-31.md",
+    "Pending_Approval/WHATSAPP_REPLY_2026-03-31_B__S_Computer_science_girls_group.md",
+    "Inbox/WHATSAPP_20260331_112707_B__S_Computer_science_girls_group.md",
+    "Inbox/WHATSAPP_20260331_110025_GIAIC_03_AI_Spec-Driven_Online_Hackathon.md",
+    "Pending_Approval/WHATSAPP_REPLY_2026-03-31_Mine.md",
+    "Done/FACEBOOK_2026-03-31.md",
+    "Done/INSTAGRAM_2026-03-31.md",
+    "Approved/WHATSAPP_REPLY_2026-03-31_Mine.md",
+    "Approved/FACEBOOK_2026-03-31.md",
+    "Pending_Approval/FACEBOOK_2026-03-31.md",
+    "Rejected/WHATSAPP_REPLY_2026-03-29_Mine.md",
+    "Inbox/WHATSAPP_20260331_100047_GIAIC_03_AI_Spec-Driven_Online_Hackathon.md",
+    "Rejected/WHATSAPP_REPLY_2026-03-31_GIAIC_03_AI_Spec-Driven_Online_Hackathon.md",
+    "Inbox/WHATSAPP_20260331_094446_Mine.md",
+    "Logs/2026-03-31.log",
+    "Inbox/WHATSAPP_20260331_094442_GIAIC_03_AI_Spec-Driven_Online_Hackathon.md",
+    "Approved/WHATSAPP_REPLY_2026-03-30_Mine.md",
+    "Pending_Approval/WHATSAPP_REPLY_2026-03-30_Mine.md",
+    "Inbox/WHATSAPP_20260330_222810_Mine.md",
+    "Logs/dashboard_stdout.log",
+    "Logs/orchestrator_stdout.log",
+    "Logs/2026-03-30.log",
     "Logs/2026-03-29.log",
     "Logs/2026-03-28.log",
     "Logs/2026-03-26.log",
     "Logs/2026-03-25.log",
     "Logs/2026-03-24.log",
-    "Approved/sedgWiacB",
-    "Logs/2026-03-12.log",
-    "Logs/2026-03-11.log",
-    "Logs/2026-03-10.log",
-    "Logs/2026-03-01.log"
+    "Approved/sedgWiacB"
   ]
 }

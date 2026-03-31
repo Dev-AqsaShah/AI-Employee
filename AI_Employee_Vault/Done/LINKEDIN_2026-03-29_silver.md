@@ -1,6 +1,6 @@
 ---
 type: linkedin_post
-status: pending_approval
+status: posted
 created: 2026-03-29T14:30:00+00:00
 character_count: 1187
 ---
@@ -40,3 +40,7 @@ What's one workflow in your company that you wish AI could handle?
 ## Instructions
 - **APPROVE:** Move to `/Approved/` — LinkedIn Watcher will auto-post
 - **REJECT:** Move to `/Rejected/`
+
+
+## Posted [2026-03-30T06:04:50.320507+00:00]
+- **Result:** Post published on LinkedIn

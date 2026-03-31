@@ -1,7 +1,7 @@
 """
 whatsapp_watcher.py — WhatsApp Monitor & Auto-Sender for AI Employee (Gold Tier)
 
-Uses Playwright persistent browser context on WhatsApp Web.
+Uses Selenium (ChromeDriver) with persistent user-data-dir on WhatsApp Web.
   - MONITOR mode: detects new messages → saves to Inbox/
   - SEND mode:    watches Approved/WHATSAPP_REPLY_*.md → sends replies
 
@@ -42,10 +42,20 @@ except ImportError:
     CLAUDE_AVAILABLE = False
 
 try:
-    from playwright.sync_api import sync_playwright
-    PLAYWRIGHT_AVAILABLE = True
+    from selenium import webdriver
+    from selenium.webdriver.chrome.options import Options
+    from selenium.webdriver.chrome.service import Service
+    from selenium.webdriver.common.by import By
+    from selenium.webdriver.common.keys import Keys
+    from selenium.webdriver.support.ui import WebDriverWait
+    from selenium.webdriver.support import expected_conditions as EC
+    from selenium.common.exceptions import (
+        TimeoutException, NoSuchElementException, WebDriverException
+    )
+    from webdriver_manager.chrome import ChromeDriverManager
+    SELENIUM_AVAILABLE = True
 except ImportError:
-    PLAYWRIGHT_AVAILABLE = False
+    SELENIUM_AVAILABLE = False
 
 logging.basicConfig(
     level=logging.INFO,
@@ -56,7 +66,7 @@ logger = logging.getLogger("WhatsAppWatcher")
 # ── Config ────────────────────────────────────────────────────────────────────
 VAULT_PATH    = Path(os.getenv("VAULT_PATH", "AI_Employee_Vault"))
 SESSION_PATH  = Path(os.getenv("WHATSAPP_SESSION_PATH", "credentials/whatsapp_session"))
-BROWSER_DIR   = SESSION_PATH / "browser_data"
+BROWSER_DIR   = Path("D:/AI-Employee/credentials/whatsapp_session/browser_data")
 DRY_RUN       = os.getenv("DRY_RUN", "false").lower() == "true"
 
 INBOX_DIR    = VAULT_PATH / "Inbox"
@@ -81,9 +91,10 @@ def _safe_name(text: str) -> str:
     return re.sub(r"[^a-zA-Z0-9_\-]", "_", text)[:40]
 
 
-def _launch(p, headless: bool = False):
-    """Launch persistent context — preserves IndexedDB for WhatsApp Web session."""
+def _build_driver(hide_window: bool = False) -> "webdriver.Chrome":
+    """Build a Selenium Chrome driver with persistent session."""
     BROWSER_DIR.mkdir(parents=True, exist_ok=True)
+
     # Remove stale lockfiles left by crashed processes
     for lf in ["lockfile", "SingletonLock", "SingletonCookie"]:
         lock_path = BROWSER_DIR / lf
@@ -92,32 +103,37 @@ def _launch(p, headless: bool = False):
                 lock_path.unlink()
             except Exception:
                 pass
-    context = p.chromium.launch_persistent_context(
-        str(BROWSER_DIR),
-        headless=False,
-        args=[
-            "--no-sandbox",
-            "--disable-dev-shm-usage",
-            "--disable-blink-features=AutomationControlled",
-            "--window-size=1,1",
-            "--window-position=0,0",
-        ],
-        viewport={"width": 1280, "height": 900},
-        user_agent=(
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/122.0.0.0 Safari/537.36"
-        ),
-        locale="en-US",
-        timezone_id="Asia/Karachi",
+
+    opts = Options()
+    opts.add_argument(f"--user-data-dir={BROWSER_DIR}")
+    opts.add_argument("--no-sandbox")
+    opts.add_argument("--disable-dev-shm-usage")
+    opts.add_argument("--disable-blink-features=AutomationControlled")
+    opts.add_argument("--lang=en-US")
+    opts.add_argument("--window-size=1280,900")
+    if hide_window:
+        opts.add_argument("--window-position=-9000,-9000")
+    else:
+        opts.add_argument("--window-position=100,100")
+    opts.add_experimental_option("excludeSwitches", ["enable-automation"])
+    opts.add_experimental_option("useAutomationExtension", False)
+    opts.add_argument(
+        "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/122.0.0.0 Safari/537.36"
     )
-    context.add_init_script(
+
+    service = Service(ChromeDriverManager().install())
+    driver = webdriver.Chrome(service=service, options=opts)
+
+    # Hide webdriver fingerprint
+    driver.execute_script(
         "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
     )
-    return context
+    return driver
 
 
-def _wait_for_home(page, timeout_sec: int = 90):
+def _wait_for_home(driver, timeout_sec: int = 90) -> bool:
     """Wait until WhatsApp Web chat list is visible."""
     selectors = [
         "#pane-side",
@@ -130,14 +146,36 @@ def _wait_for_home(page, timeout_sec: int = 90):
     while time.time() < deadline:
         for sel in selectors:
             try:
-                el = page.query_selector(sel)
-                if el and el.is_visible():
+                els = driver.find_elements(By.CSS_SELECTOR, sel)
+                if els and els[0].is_displayed():
                     logger.info(f"WhatsApp home loaded ({sel})")
                     return True
             except Exception:
                 pass
         time.sleep(2)
     return False
+
+
+def _find_element(driver, selectors: list, timeout: int = 5):
+    """Try multiple CSS selectors, return first visible element found or None."""
+    for sel in selectors:
+        try:
+            el = WebDriverWait(driver, timeout).until(
+                EC.visibility_of_element_located((By.CSS_SELECTOR, sel))
+            )
+            if el:
+                return el
+        except Exception:
+            pass
+    return None
+
+
+def _screenshot(driver, path: str):
+    """Save a screenshot, swallowing errors."""
+    try:
+        driver.save_screenshot(path)
+    except Exception:
+        pass
 
 
 def extract_reply(filepath: Path) -> tuple:
@@ -158,86 +196,37 @@ def extract_reply(filepath: Path) -> tuple:
 # ── Setup ─────────────────────────────────────────────────────────────────────
 
 def setup_session():
-    """Open WhatsApp Web for QR scan. Works on both desktop and headless EC2."""
-    if not PLAYWRIGHT_AVAILABLE:
-        print("ERROR: Playwright not installed.")
-        print("Run: pip install playwright && playwright install chromium")
+    """Open WhatsApp Web for QR scan using Selenium (visible browser)."""
+    if not SELENIUM_AVAILABLE:
+        print("ERROR: Selenium not installed.")
+        print("Run: pip install selenium webdriver-manager")
         return False
-
-    import platform
-    is_linux = platform.system() == "Linux"
 
     print("\n" + "=" * 55)
     print("WHATSAPP WEB SESSION SETUP")
     print("=" * 55)
-    if is_linux:
-        print("EC2/Linux mode: QR code will be saved as qr_code.png")
-        print("Download and scan it with your phone.")
-    else:
-        print("Browser will open — scan QR code with your phone.")
+    print("Browser will open — scan QR code with your phone.")
     print("=" * 55 + "\n")
 
-    qr_path = Path("qr_code.png")
-
     try:
-        with sync_playwright() as p:
-            if is_linux:
-                # Headless on Linux/EC2
-                context = p.chromium.launch_persistent_context(
-                    str(BROWSER_DIR),
-                    headless=True,
-                    args=["--no-sandbox", "--disable-dev-shm-usage",
-                          "--disable-blink-features=AutomationControlled"],
-                    viewport={"width": 1280, "height": 900},
-                    user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-                )
-            else:
-                context = _launch(p, headless=False)
+        driver = _build_driver(hide_window=False)
+        print("Opening https://web.whatsapp.com ...")
+        driver.get(WHATSAPP_URL)
+        time.sleep(5)
 
-            page = context.new_page()
-            print("Opening https://web.whatsapp.com ...")
-            page.goto(WHATSAPP_URL, wait_until="domcontentloaded", timeout=60000)
+        print("Scan the QR code in the browser window...")
+        loaded = _wait_for_home(driver, timeout_sec=120)
+        if loaded:
+            print("WhatsApp home loaded! Session saved.")
+        else:
+            print("Timeout — session may still be saved.")
 
-            if is_linux:
-                # Wait for QR code to appear and save screenshot
-                print("Waiting for QR code...")
-                for i in range(60):
-                    time.sleep(2)
-                    # Check if QR appeared
-                    qr_el = page.query_selector("canvas[aria-label='Scan this QR code to link a device'], [data-testid='qrcode'], canvas")
-                    if qr_el:
-                        qr_el.screenshot(path=str(qr_path))
-                        print(f"\nQR code saved: {qr_path.absolute()}")
-                        print("Download this file and scan with WhatsApp on your phone.")
-                        print("  scp ubuntu@51.20.40.140:~/AI-Employee/qr_code.png .")
-                        break
-                    else:
-                        page.screenshot(path=str(qr_path))
-                        print(f"  Waiting... ({(i+1)*2}s) — QR screenshot saved to {qr_path}")
+        input("\nPress Enter to save session and close: ")
+        driver.quit()
+        print(f"\nDone! Session: {BROWSER_DIR}")
+        _log("SETUP_COMPLETE", str(BROWSER_DIR))
+        return True
 
-                # Wait for home to load (user scans QR)
-                print("\nWaiting for you to scan QR (up to 3 minutes)...")
-                loaded = _wait_for_home(page, timeout_sec=180)
-                if loaded:
-                    print("SUCCESS! WhatsApp connected. Session saved.")
-                    _log("SETUP_COMPLETE", str(BROWSER_DIR))
-                else:
-                    page.screenshot(path=str(qr_path))
-                    print(f"Timeout — check {qr_path} for current state.")
-            else:
-                print("Scan the QR code in the browser window...")
-                loaded = _wait_for_home(page, timeout_sec=120)
-                if loaded:
-                    print("WhatsApp home loaded! Session saved.")
-                else:
-                    print("Timeout — session may still be saved.")
-                input("\nPress Enter to save session and close: ")
-
-            context.close()
-            if qr_path.exists():
-                qr_path.unlink(missing_ok=True)
-            print(f"\nDone! Session: {BROWSER_DIR}")
-            return True
     except Exception as e:
         print(f"\nERROR: {e}")
         return False
@@ -247,8 +236,8 @@ def setup_session():
 
 def check_messages() -> list:
     """Open WhatsApp Web, find unread chats, return list of message dicts."""
-    if not PLAYWRIGHT_AVAILABLE:
-        logger.error("Playwright not installed.")
+    if not SELENIUM_AVAILABLE:
+        logger.error("Selenium not installed.")
         return []
 
     if not BROWSER_DIR.exists():
@@ -262,129 +251,134 @@ def check_messages() -> list:
     debug_dir = Path("debug_screenshots")
     debug_dir.mkdir(exist_ok=True)
 
+    driver = None
     try:
-        with sync_playwright() as p:
-            context = _launch(p, headless=False)
-            page = context.new_page()
-            logger.info("Opening WhatsApp Web (visible for setup)...")
-            page.goto(WHATSAPP_URL, wait_until="domcontentloaded", timeout=60000)
-            time.sleep(5)
+        driver = _build_driver(hide_window=False)
+        logger.info("Opening WhatsApp Web (visible for setup)...")
+        driver.get(WHATSAPP_URL)
+        time.sleep(5)
 
-            loaded = _wait_for_home(page, timeout_sec=60)
-            if not loaded:
-                page.screenshot(path=str(debug_dir / "wa_error_login.png"))
-                logger.error("WhatsApp home not loaded. Run --setup again.")
-                context.close()
-                return []
+        loaded = _wait_for_home(driver, timeout_sec=60)
+        if not loaded:
+            _screenshot(driver, str(debug_dir / "wa_error_login.png"))
+            logger.error("WhatsApp home not loaded. Run --setup again.")
+            driver.quit()
+            return []
 
-            time.sleep(2)
-            page.screenshot(path=str(debug_dir / "wa_1_home.png"))
-            logger.info("Scanning for unread chats...")
+        time.sleep(2)
+        _screenshot(driver, str(debug_dir / "wa_1_home.png"))
+        logger.info("Scanning for unread chats...")
 
-            # Find chats with unread badge — try multiple selectors
-            chats = []
-            for sel in [
-                "[data-testid='cell-frame-container']",
-                "div[role='listitem']",
-                "#pane-side [tabindex='-1']",
-                "#pane-side > div > div > div > div",
-            ]:
-                chats = page.query_selector_all(sel)
-                if chats:
-                    logger.info(f"Found {len(chats)} chats with: {sel}")
-                    break
-            logger.info(f"Chats visible: {len(chats)}")
+        # Find chats with unread badge — try multiple selectors
+        chats = []
+        for sel in [
+            "[data-testid='cell-frame-container']",
+            "div[role='listitem']",
+            "#pane-side [tabindex='-1']",
+            "#pane-side > div > div > div > div",
+        ]:
+            chats = driver.find_elements(By.CSS_SELECTOR, sel)
+            if chats:
+                logger.info(f"Found {len(chats)} chats with: {sel}")
+                break
+        logger.info(f"Chats visible: {len(chats)}")
 
-            for chat in chats:
-                try:
-                    # Check for unread badge (green number)
-                    # Check for unread badge (green number)
-                    badge = None
-                    for badge_sel in [
-                        "[data-testid='icon-unread-count']",
-                        "span[aria-label*='unread']",
-                        "span.bg-icon-unread-count",
-                    ]:
-                        badge = chat.query_selector(badge_sel)
-                        if badge:
-                            break
-                    if not badge:
-                        continue
-
-                    # Get contact name
-                    name_el = None
-                    for name_sel in [
-                        "[data-testid='cell-frame-title']",
-                        "span[title]",
-                        "span[dir='auto']",
-                    ]:
-                        name_el = chat.query_selector(name_sel)
-                        if name_el:
-                            break
-                    contact = name_el.inner_text().strip() if name_el else "Unknown"
-
-                    # Groups allowed — don't skip them
-
-                    chat_id = f"wa_{_safe_name(contact)}_{datetime.now().strftime('%Y%m%d')}"
-                    if chat_id in seen_ids:
-                        continue
-
-                    chat.click()
-                    time.sleep(3)
-
-                    # Extract incoming messages using JavaScript (most reliable)
-                    chat_texts = page.evaluate("""() => {
-                        const texts = [];
-                        // Get incoming messages only (message-in class)
-                        const incomingRows = document.querySelectorAll(
-                            '[data-testid="msg-container"]:not(.message-out), ' +
-                            '.message-in [data-testid="msg-container"], ' +
-                            'div[class*="message-in"]'
-                        );
-                        // Fallback: all message containers
-                        const allRows = document.querySelectorAll('[data-testid="msg-container"]');
-                        const rows = incomingRows.length > 0 ? incomingRows : allRows;
-                        const last = Array.from(rows).slice(-10);
-                        for (const row of last) {
-                            // Try copyable-text attribute first (has sender + time info stripped)
-                            const copyable = row.querySelector('.copyable-text');
-                            if (copyable) {
-                                const spans = copyable.querySelectorAll('span');
-                                let txt = '';
-                                for (const s of spans) {
-                                    if (s.children.length === 0 && s.textContent.trim()) {
-                                        txt += s.textContent.trim() + ' ';
-                                    }
-                                }
-                                txt = txt.trim();
-                                if (txt && txt.length > 1) { texts.push(txt); continue; }
-                                // fallback to innerText
-                                txt = copyable.innerText.trim();
-                                if (txt) { texts.push(txt); continue; }
-                            }
-                            // Last resort: full row text
-                            const full = row.innerText.trim();
-                            if (full && full.length > 2) texts.push(full.slice(0, 400));
+        for chat in chats:
+            try:
+                # Check for unread badge using JS (WhatsApp uses obfuscated class names)
+                has_badge = driver.execute_script("""
+                    const chat = arguments[0];
+                    // Look for a span containing only digits (unread count)
+                    const spans = chat.querySelectorAll('span');
+                    for (const s of spans) {
+                        const t = s.textContent.trim();
+                        if (/^[0-9]+$/.test(t) && parseInt(t) > 0 && parseInt(t) < 1000) {
+                            // Make sure it looks like a badge (small, positioned)
+                            const r = s.getBoundingClientRect();
+                            if (r.width > 0 && r.width < 40) return true;
                         }
-                        return texts;
-                    }""")
-                    if not chat_texts:
-                        chat_texts = []
-
-                    messages.append({"contact": contact, "messages": chat_texts, "chat_id": chat_id})
-                    seen_ids.add(chat_id)
-                    logger.info(f"New message from: {contact}")
-
-                except Exception as e:
-                    logger.warning(f"Chat read error: {e}")
+                    }
+                    // Also check aria-label on the chat row
+                    const label = chat.getAttribute('aria-label') || '';
+                    if (label.toLowerCase().includes('unread')) return true;
+                    return false;
+                """, chat)
+                if not has_badge:
                     continue
 
-            context.close()
-            seen_file.write_text("\n".join(seen_ids), encoding="utf-8")
+                # Get contact name
+                name_el = None
+                for name_sel in [
+                    "[data-testid='cell-frame-title']",
+                    "span[title]",
+                    "span[dir='auto']",
+                ]:
+                    found = chat.find_elements(By.CSS_SELECTOR, name_sel)
+                    if found:
+                        name_el = found[0]
+                        break
+                contact = name_el.text.strip() if name_el else "Unknown"
+
+                chat_id = f"wa_{_safe_name(contact)}_{datetime.now().strftime('%Y%m%d_%H')}"
+                if chat_id in seen_ids:
+                    continue
+
+                chat.click()
+                time.sleep(3)
+
+                # Extract incoming messages using JavaScript (most reliable)
+                chat_texts = driver.execute_script("""
+                    const texts = [];
+                    const incomingRows = document.querySelectorAll(
+                        '[data-testid="msg-container"]:not(.message-out), ' +
+                        '.message-in [data-testid="msg-container"], ' +
+                        'div[class*="message-in"]'
+                    );
+                    const allRows = document.querySelectorAll('[data-testid="msg-container"]');
+                    const rows = incomingRows.length > 0 ? incomingRows : allRows;
+                    const last = Array.from(rows).slice(-10);
+                    for (const row of last) {
+                        const copyable = row.querySelector('.copyable-text');
+                        if (copyable) {
+                            const spans = copyable.querySelectorAll('span');
+                            let txt = '';
+                            for (const s of spans) {
+                                if (s.children.length === 0 && s.textContent.trim()) {
+                                    txt += s.textContent.trim() + ' ';
+                                }
+                            }
+                            txt = txt.trim();
+                            if (txt && txt.length > 1) { texts.push(txt); continue; }
+                            txt = copyable.innerText.trim();
+                            if (txt) { texts.push(txt); continue; }
+                        }
+                        const full = row.innerText.trim();
+                        if (full && full.length > 2) texts.push(full.slice(0, 400));
+                    }
+                    return texts;
+                """)
+                if not chat_texts:
+                    chat_texts = []
+
+                messages.append({"contact": contact, "messages": chat_texts, "chat_id": chat_id})
+                seen_ids.add(chat_id)
+                logger.info(f"New message from: {contact}")
+
+            except Exception as e:
+                logger.warning(f"Chat read error: {e}")
+                continue
+
+        driver.quit()
+        seen_file.write_text("\n".join(seen_ids), encoding="utf-8")
 
     except Exception as e:
         logger.error(f"check_messages failed: {e}")
         _log("CHECK_ERROR", str(e)[:200])
+        if driver:
+            try:
+                driver.quit()
+            except Exception:
+                pass
 
     return messages
 
@@ -520,6 +514,92 @@ status: pending_approval
 
 # ── Sender ────────────────────────────────────────────────────────────────────
 
+def _open_chat_in_driver(driver, contact: str, debug_dir: Path) -> bool:
+    """Find and click a chat by contact name. Returns True if opened."""
+    # Try chat list first
+    chats = driver.find_elements(By.CSS_SELECTOR, "#pane-side [tabindex='-1']")
+    for chat in chats:
+        try:
+            name_els = chat.find_elements(By.CSS_SELECTOR, "span[title], [data-testid='cell-frame-title']")
+            if name_els:
+                name = name_els[0].get_attribute("title") or name_els[0].text
+                if name.strip().lower() == contact.strip().lower():
+                    chat.click()
+                    time.sleep(3)
+                    logger.info(f"Opened chat via list: {contact}")
+                    return True
+        except Exception:
+            continue
+
+    # Fallback: use search bar
+    logger.info(f"'{contact}' not in visible list, trying search...")
+    search = _find_element(driver, [
+        "[data-testid='chat-list-search']",
+        "[aria-label='Search input textbox']",
+        "[aria-label='Search or start new chat']",
+        "div[contenteditable='true'][data-tab='3']",
+        "#side div[contenteditable='true']",
+    ], timeout=5)
+
+    if not search:
+        return False
+
+    search.click()
+    time.sleep(1)
+    search.send_keys(contact)
+    time.sleep(3)
+    _screenshot(driver, str(debug_dir / "wa_2_search.png"))
+
+    time.sleep(1)
+    results = driver.find_elements(By.CSS_SELECTOR, "[data-testid='cell-frame-container']")
+    for r in results:
+        try:
+            name_els = r.find_elements(By.CSS_SELECTOR, "span[title], [data-testid='cell-frame-title']")
+            if name_els:
+                name = name_els[0].get_attribute("title") or name_els[0].text
+                if contact.strip().lower() in name.strip().lower():
+                    r.click()
+                    time.sleep(3)
+                    logger.info(f"Opened chat via search: {name}")
+                    return True
+        except Exception:
+            continue
+
+    return False
+
+
+def _type_and_send(driver, message: str):
+    """Type message into compose box and send it."""
+    msg_input = _find_element(driver, [
+        "[data-testid='conversation-compose-box-input']",
+        "div[contenteditable='true'][data-tab='10']",
+        "[aria-label='Type a message'][contenteditable='true']",
+        "footer div[contenteditable='true']",
+        "div[contenteditable='true']",
+    ], timeout=5)
+
+    if not msg_input:
+        raise RuntimeError("Could not find message input box")
+
+    msg_input.click()
+    time.sleep(1)
+
+    for line in message.split("\n"):
+        msg_input.send_keys(line)
+        msg_input.send_keys(Keys.SHIFT, Keys.ENTER)
+    time.sleep(1)
+
+    # Send button
+    send_btn = _find_element(driver, [
+        "[data-testid='send']",
+        "[aria-label='Send']",
+    ], timeout=5)
+    if not send_btn:
+        raise RuntimeError("Could not find Send button")
+    send_btn.click()
+    time.sleep(3)
+
+
 def send_reply(contact: str, message: str) -> dict:
     """Send a WhatsApp message to a contact."""
     if DRY_RUN:
@@ -532,135 +612,43 @@ def send_reply(contact: str, message: str) -> dict:
     debug_dir = Path("debug_screenshots")
     debug_dir.mkdir(exist_ok=True)
 
+    driver = None
     try:
-        with sync_playwright() as p:
-            context = _launch(p, headless=False)
-            page = context.new_page()
-            logger.info("Opening WhatsApp Web for sending...")
-            page.goto(WHATSAPP_URL, wait_until="domcontentloaded", timeout=60000)
-            time.sleep(5)
+        driver = _build_driver(hide_window=False)
+        logger.info("Opening WhatsApp Web for sending...")
+        driver.get(WHATSAPP_URL)
+        time.sleep(5)
 
-            if not _wait_for_home(page, timeout_sec=60):
-                context.close()
-                return {"status": "error", "message": "Session expired. Run --setup"}
+        if not _wait_for_home(driver, timeout_sec=60):
+            driver.quit()
+            return {"status": "error", "message": "Session expired. Run --setup"}
 
-            time.sleep(2)
+        time.sleep(2)
 
-            # Find contact in chat list by exact name match
-            chat_opened = False
-            chats = page.query_selector_all("#pane-side [tabindex='-1']")
-            for chat in chats:
-                try:
-                    name_el = chat.query_selector("span[title], [data-testid='cell-frame-title']")
-                    if name_el:
-                        name = name_el.get_attribute("title") or name_el.inner_text()
-                        if name.strip().lower() == contact.strip().lower():
-                            chat.click()
-                            time.sleep(3)
-                            chat_opened = True
-                            logger.info(f"Opened chat via list: {contact}")
-                            break
-                except Exception:
-                    continue
+        chat_opened = _open_chat_in_driver(driver, contact, debug_dir)
+        if not chat_opened:
+            driver.quit()
+            return {"status": "error", "message": f"Contact '{contact}' not found in WhatsApp"}
 
-            # Fallback: use search bar if not found in list
-            if not chat_opened:
-                logger.info(f"'{contact}' not in visible list, trying search...")
-                search = None
-                for s_sel in [
-                    "[data-testid='chat-list-search']",
-                    "[aria-label='Search input textbox']",
-                    "[aria-label='Search or start new chat']",
-                    "div[contenteditable='true'][data-tab='3']",
-                    "#side div[contenteditable='true']",
-                ]:
-                    try:
-                        search = page.wait_for_selector(s_sel, timeout=5000)
-                        if search and search.is_visible():
-                            break
-                    except Exception:
-                        continue
-                if not search:
-                    context.close()
-                    return {"status": "error", "message": "Could not find search box or contact"}
-                search.click()
-                time.sleep(1)
-                page.keyboard.type(contact, delay=80)
-                time.sleep(3)
-                page.screenshot(path=str(debug_dir / "wa_2_search.png"))
+        _screenshot(driver, str(debug_dir / "wa_3_chat.png"))
+        _screenshot(driver, str(debug_dir / "wa_3b_chat_open.png"))
 
-                # Find exact match in search results
-                time.sleep(1)
-                results = page.query_selector_all("[data-testid='cell-frame-container']")
-                clicked = False
-                for r in results:
-                    try:
-                        name_el = r.query_selector("span[title], [data-testid='cell-frame-title']")
-                        if name_el:
-                            name = name_el.get_attribute("title") or name_el.inner_text()
-                            if contact.strip().lower() in name.strip().lower():
-                                r.click()
-                                time.sleep(3)
-                                clicked = True
-                                logger.info(f"Opened chat via search: {name}")
-                                break
-                    except Exception:
-                        continue
-                if not clicked:
-                    context.close()
-                    return {"status": "error", "message": f"Contact '{contact}' not found in WhatsApp"}
+        _type_and_send(driver, message)
 
-            page.screenshot(path=str(debug_dir / "wa_3_chat.png"))
-
-            page.screenshot(path=str(debug_dir / "wa_3b_chat_open.png"))
-
-            # Type message — try multiple selectors
-            msg_input = None
-            for sel in [
-                "[data-testid='conversation-compose-box-input']",
-                "div[contenteditable='true'][data-tab='10']",
-                "[aria-label='Type a message'][contenteditable='true']",
-                "footer div[contenteditable='true']",
-                "div[contenteditable='true']",
-            ]:
-                try:
-                    el = page.wait_for_selector(sel, timeout=5000)
-                    if el and el.is_visible():
-                        msg_input = el
-                        logger.info(f"Found message input: {sel}")
-                        break
-                except Exception:
-                    continue
-
-            if not msg_input:
-                page.screenshot(path=str(debug_dir / "wa_error_no_input.png"))
-                raise RuntimeError("Could not find message input box")
-            msg_input.click()
-            time.sleep(1)
-
-            for line in message.split("\n"):
-                page.keyboard.type(line, delay=30)
-                page.keyboard.press("Shift+Enter")
-            time.sleep(1)
-
-            page.screenshot(path=str(debug_dir / "wa_4_typed.png"))
-
-            # Send
-            send = page.wait_for_selector(
-                "[data-testid='send'], [aria-label='Send']",
-                timeout=5000,
-            )
-            send.click()
-            time.sleep(3)
-
-            page.screenshot(path=str(debug_dir / "wa_5_sent.png"))
-            logger.info(f"Message sent to {contact}!")
-            context.close()
-            return {"status": "success", "message": f"Sent to {contact}"}
+        _screenshot(driver, str(debug_dir / "wa_4_typed.png"))
+        _screenshot(driver, str(debug_dir / "wa_5_sent.png"))
+        logger.info(f"Message sent to {contact}!")
+        driver.quit()
+        return {"status": "success", "message": f"Sent to {contact}"}
 
     except Exception as e:
         logger.error(f"Send failed: {e}")
         _log("SEND_ERROR", str(e)[:200])
+        if driver:
+            try:
+                driver.quit()
+            except Exception:
+                pass
         return {"status": "error", "message": str(e)[:200]}
 
 
@@ -679,6 +667,7 @@ def send_approved_replies() -> list:
             raw = filepath.read_text(encoding="utf-8")
             raw = raw.replace("status: pending_approval", "status: sent")
             raw += f"\n\n## Sent [{datetime.now(timezone.utc).isoformat()}]\n- **Result:** {result['message']}\n"
+            DONE_DIR.mkdir(parents=True, exist_ok=True)
             (DONE_DIR / filepath.name).write_text(raw, encoding="utf-8")
             filepath.unlink()
             _log("REPLY_SENT", filepath.name)
@@ -698,8 +687,8 @@ class WhatsAppWatcher(BaseWatcher):
         return save_to_inbox(item)
 
     def run(self):
-        """Persistent headless browser — stays open, checks every 30s, instant on new message."""
-        logger.info("WhatsApp Watcher started (headless background mode).")
+        """Persistent background browser — stays open, checks every 30s."""
+        logger.info("WhatsApp Watcher started (background mode).")
         stop_file = VAULT_PATH / "STOP.md"
 
         while True:
@@ -708,7 +697,7 @@ class WhatsAppWatcher(BaseWatcher):
                 time.sleep(10)
                 continue
             try:
-                logger.info("Starting persistent headless browser session...")
+                logger.info("Starting persistent browser session...")
                 self._run_persistent()
             except KeyboardInterrupt:
                 logger.info("Stopped.")
@@ -719,9 +708,9 @@ class WhatsAppWatcher(BaseWatcher):
                 time.sleep(30)
 
     def _run_persistent(self):
-        """Keep browser open continuously. Check for unread every 30s. No browser popup."""
-        if not PLAYWRIGHT_AVAILABLE:
-            logger.error("Playwright not installed.")
+        """Keep browser open continuously. Check for unread every 30s."""
+        if not SELENIUM_AVAILABLE:
+            logger.error("Selenium not installed.")
             return
         if not BROWSER_DIR.exists():
             logger.error("No session. Run: python watchers/whatsapp_watcher.py --setup")
@@ -730,17 +719,17 @@ class WhatsAppWatcher(BaseWatcher):
         seen_file = VAULT_PATH / ".processed_whatsapp_ids"
         seen_ids = set(seen_file.read_text(encoding="utf-8").splitlines()) if seen_file.exists() else set()
 
-        with sync_playwright() as p:
-            # headless=True — no browser window on screen
-            context = _launch(p, headless=True)
-            page = context.new_page()
-            logger.info("Opening WhatsApp Web (background, headless)...")
-            page.goto(WHATSAPP_URL, wait_until="domcontentloaded", timeout=60000)
+        driver = None
+        try:
+            # hide_window=True moves Chrome off-screen — works with Selenium/ChromeDriver
+            driver = _build_driver(hide_window=True)
+            logger.info("Opening WhatsApp Web (background, off-screen window)...")
+            driver.get(WHATSAPP_URL)
             time.sleep(8)
 
-            if not _wait_for_home(page, timeout_sec=90):
+            if not _wait_for_home(driver, timeout_sec=90):
                 logger.error("WhatsApp home not loaded. Run --setup again (with visible browser).")
-                context.close()
+                driver.quit()
                 return
 
             logger.info("WhatsApp connected. Watching for new messages...")
@@ -754,41 +743,58 @@ class WhatsAppWatcher(BaseWatcher):
 
                 try:
                     # ── Check for unread badges ───────────────────────────
-                    has_unread = page.evaluate("""() => {
-                        const badges = document.querySelectorAll(
-                            '[data-testid="icon-unread-count"], span[aria-label*="unread"], span[data-testid="badge"]'
-                        );
-                        return badges.length > 0;
-                    }""")
+                    has_unread = driver.execute_script("""
+                        const spans = document.querySelectorAll('#pane-side span');
+                        for (const s of spans) {
+                            const t = s.textContent.trim();
+                            if (/^[0-9]+$/.test(t) && parseInt(t) > 0 && parseInt(t) < 1000) {
+                                const r = s.getBoundingClientRect();
+                                if (r.width > 0 && r.width < 40) return true;
+                            }
+                        }
+                        return false;
+                    """)
 
                     if has_unread:
                         logger.info("Unread message detected! Processing...")
-                        chats = page.query_selector_all("#pane-side [tabindex='-1']")
+                        chats = driver.find_elements(By.CSS_SELECTOR, "#pane-side [tabindex='-1']")
                         for chat in chats:
                             try:
-                                badge = None
-                                for badge_sel in ["[data-testid='icon-unread-count']", "span[aria-label*='unread']"]:
-                                    badge = chat.query_selector(badge_sel)
-                                    if badge:
-                                        break
-                                if not badge:
+                                has_badge = driver.execute_script("""
+                                    const chat = arguments[0];
+                                    const spans = chat.querySelectorAll('span');
+                                    for (const s of spans) {
+                                        const t = s.textContent.trim();
+                                        if (/^[0-9]+$/.test(t) && parseInt(t) > 0 && parseInt(t) < 1000) {
+                                            const r = s.getBoundingClientRect();
+                                            if (r.width > 0 && r.width < 40) return true;
+                                        }
+                                    }
+                                    return false;
+                                """, chat)
+                                if not has_badge:
                                     continue
 
                                 name_el = None
-                                for name_sel in ["[data-testid='cell-frame-title']", "span[title]", "span[dir='auto']"]:
-                                    name_el = chat.query_selector(name_sel)
-                                    if name_el:
+                                for name_sel in [
+                                    "[data-testid='cell-frame-title']",
+                                    "span[title]",
+                                    "span[dir='auto']",
+                                ]:
+                                    found = chat.find_elements(By.CSS_SELECTOR, name_sel)
+                                    if found:
+                                        name_el = found[0]
                                         break
-                                contact = name_el.inner_text().strip() if name_el else "Unknown"
+                                contact = name_el.text.strip() if name_el else "Unknown"
 
-                                chat_id = f"wa_{_safe_name(contact)}_{datetime.now().strftime('%Y%m%d')}"
+                                chat_id = f"wa_{_safe_name(contact)}_{datetime.now().strftime('%Y%m%d_%H')}"
                                 if chat_id in seen_ids:
                                     continue
 
                                 chat.click()
                                 time.sleep(2)
 
-                                chat_texts = page.evaluate("""() => {
+                                chat_texts = driver.execute_script("""
                                     const texts = [];
                                     const rows = document.querySelectorAll('[data-testid="msg-container"]');
                                     const last = Array.from(rows).slice(-10);
@@ -810,7 +816,7 @@ class WhatsAppWatcher(BaseWatcher):
                                         if (full && full.length > 2) texts.push(full.slice(0, 400));
                                     }
                                     return texts;
-                                }""") or []
+                                """) or []
 
                                 msg = {"contact": contact, "messages": chat_texts, "chat_id": chat_id}
                                 p_path = save_to_inbox(msg)
@@ -820,9 +826,9 @@ class WhatsAppWatcher(BaseWatcher):
                                 logger.info(f"Saved + drafted reply for: {contact}")
 
                                 # Go back to main chat list
-                                page.goto(WHATSAPP_URL, wait_until="domcontentloaded", timeout=30000)
+                                driver.get(WHATSAPP_URL)
                                 time.sleep(3)
-                                _wait_for_home(page, timeout_sec=20)
+                                _wait_for_home(driver, timeout_sec=20)
 
                             except Exception as e:
                                 logger.warning(f"Chat error: {e}")
@@ -835,17 +841,17 @@ class WhatsAppWatcher(BaseWatcher):
                         if not contact or not message:
                             continue
                         try:
-                            page.goto(WHATSAPP_URL, wait_until="domcontentloaded", timeout=30000)
+                            driver.get(WHATSAPP_URL)
                             time.sleep(3)
-                            _wait_for_home(page, timeout_sec=20)
+                            _wait_for_home(driver, timeout_sec=20)
 
-                            chats2 = page.query_selector_all("#pane-side [tabindex='-1']")
+                            chats2 = driver.find_elements(By.CSS_SELECTOR, "#pane-side [tabindex='-1']")
                             opened = False
                             for ch in chats2:
                                 try:
-                                    name_el = ch.query_selector("span[title], [data-testid='cell-frame-title']")
-                                    if name_el:
-                                        name = name_el.get_attribute("title") or name_el.inner_text()
+                                    name_els = ch.find_elements(By.CSS_SELECTOR, "span[title], [data-testid='cell-frame-title']")
+                                    if name_els:
+                                        name = name_els[0].get_attribute("title") or name_els[0].text
                                         if name.strip().lower() == contact.strip().lower():
                                             ch.click()
                                             time.sleep(3)
@@ -858,34 +864,13 @@ class WhatsAppWatcher(BaseWatcher):
                                 logger.warning(f"Contact '{contact}' not found")
                                 continue
 
-                            msg_input = None
-                            for sel in ["div[contenteditable='true'][data-tab='10']", "[data-testid='conversation-compose-box-input']", "footer div[contenteditable='true']"]:
-                                try:
-                                    el = page.wait_for_selector(sel, timeout=5000)
-                                    if el and el.is_visible():
-                                        msg_input = el
-                                        break
-                                except Exception:
-                                    continue
-
-                            if not msg_input:
-                                continue
-
-                            msg_input.click()
-                            time.sleep(1)
-                            for line in message.split("\n"):
-                                page.keyboard.type(line, delay=30)
-                                page.keyboard.press("Shift+Enter")
-                            time.sleep(1)
-
-                            send_btn = page.wait_for_selector("[data-testid='send'], [aria-label='Send']", timeout=5000)
-                            send_btn.click()
-                            time.sleep(3)
+                            _type_and_send(driver, message)
 
                             logger.info(f"Reply sent to {contact}!")
                             raw = filepath.read_text(encoding="utf-8")
                             raw = raw.replace("status: pending_approval", "status: sent")
                             raw += f"\n\n## Sent [{datetime.now(timezone.utc).isoformat()}]\n"
+                            DONE_DIR.mkdir(parents=True, exist_ok=True)
                             (DONE_DIR / filepath.name).write_text(raw, encoding="utf-8")
                             filepath.unlink()
                             self.log_event("WA_SENT", filepath.name)
@@ -897,12 +882,21 @@ class WhatsAppWatcher(BaseWatcher):
                 except Exception as e:
                     logger.warning(f"Cycle error: {e}")
 
-                time.sleep(30)  # Check every 30 seconds — lightweight, no browser open/close
+                time.sleep(30)  # Check every 30 seconds
+
+        except Exception as e:
+            logger.error(f"_run_persistent crashed: {e}")
+        finally:
+            if driver:
+                try:
+                    driver.quit()
+                except Exception:
+                    pass
 
     def _run_cycle(self):
         """One cycle: open browser once, check messages + send replies, close."""
-        if not PLAYWRIGHT_AVAILABLE:
-            logger.error("Playwright not installed.")
+        if not SELENIUM_AVAILABLE:
+            logger.error("Selenium not installed.")
             return
         if not BROWSER_DIR.exists():
             logger.error("No session. Run: python watchers/whatsapp_watcher.py --setup")
@@ -910,205 +904,183 @@ class WhatsAppWatcher(BaseWatcher):
 
         seen_file = VAULT_PATH / ".processed_whatsapp_ids"
         seen_ids = set(seen_file.read_text(encoding="utf-8").splitlines()) if seen_file.exists() else set()
-        approved_files = list(APPROVED_DIR.glob("WHATSAPP_REPLY_*.md"))
-
-        # Skip opening browser if nothing to do
-        if not approved_files:
-            # Still need to check for new messages
-            pass
 
         stop_file = VAULT_PATH / "STOP.md"
         debug_dir = Path("debug_screenshots")
         debug_dir.mkdir(exist_ok=True)
 
+        driver = None
         try:
-            with sync_playwright() as p:
-                context = _launch(p, headless=False)
-                page = context.new_page()
-                logger.info("Opening WhatsApp Web...")
-                page.goto(WHATSAPP_URL, wait_until="domcontentloaded", timeout=60000)
-                time.sleep(5)
+            driver = _build_driver(hide_window=False)
+            logger.info("Opening WhatsApp Web...")
+            driver.get(WHATSAPP_URL)
+            time.sleep(5)
 
-                if not _wait_for_home(page, timeout_sec=60):
-                    logger.error("WhatsApp home not loaded. Run --setup again.")
-                    context.close()
-                    return
+            if not _wait_for_home(driver, timeout_sec=60):
+                logger.error("WhatsApp home not loaded. Run --setup again.")
+                driver.quit()
+                return
 
-                time.sleep(2)
+            time.sleep(2)
 
-                # ── 1. Check for new messages ─────────────────────────────
-                logger.info("Scanning for unread chats...")
-                chats = []
-                for sel in [
-                    "[data-testid='cell-frame-container']",
-                    "div[role='listitem']",
-                    "#pane-side [tabindex='-1']",
-                    "#pane-side > div > div > div > div",
-                ]:
-                    chats = page.query_selector_all(sel)
-                    if chats:
-                        break
+            # ── 1. Check for new messages ─────────────────────────────
+            logger.info("Scanning for unread chats...")
+            chats = []
+            for sel in [
+                "[data-testid='cell-frame-container']",
+                "div[role='listitem']",
+                "#pane-side [tabindex='-1']",
+                "#pane-side > div > div > div > div",
+            ]:
+                chats = driver.find_elements(By.CSS_SELECTOR, sel)
+                if chats:
+                    break
 
-                new_msgs = []
-                for chat in chats:
-                    try:
-                        badge = None
-                        for badge_sel in ["[data-testid='icon-unread-count']", "span[aria-label*='unread']", "span.bg-icon-unread-count"]:
-                            badge = chat.query_selector(badge_sel)
-                            if badge:
-                                break
-                        if not badge:
-                            continue
-
-                        name_el = None
-                        for name_sel in ["[data-testid='cell-frame-title']", "span[title]", "span[dir='auto']"]:
-                            name_el = chat.query_selector(name_sel)
-                            if name_el:
-                                break
-                        contact = name_el.inner_text().strip() if name_el else "Unknown"
-
-                        chat_id = f"wa_{_safe_name(contact)}_{datetime.now().strftime('%Y%m%d')}"
-                        if chat_id in seen_ids:
-                            continue
-
-                        chat.click()
-                        time.sleep(2)
-
-                        # Extract messages via JS
-                        chat_texts = page.evaluate("""() => {
-                            const texts = [];
-                            const allRows = document.querySelectorAll('[data-testid="msg-container"]');
-                            const last = Array.from(allRows).slice(-10);
-                            for (const row of last) {
-                                const copyable = row.querySelector('.copyable-text');
-                                if (copyable) {
-                                    const spans = copyable.querySelectorAll('span');
-                                    let txt = '';
-                                    for (const s of spans) {
-                                        if (s.children.length === 0 && s.textContent.trim()) {
-                                            txt += s.textContent.trim() + ' ';
-                                        }
-                                    }
-                                    txt = txt.trim();
-                                    if (txt && txt.length > 1) { texts.push(txt); continue; }
-                                    txt = copyable.innerText.trim();
-                                    if (txt) { texts.push(txt); continue; }
-                                }
-                                const full = row.innerText.trim();
-                                if (full && full.length > 2) texts.push(full.slice(0, 400));
-                            }
-                            return texts;
-                        }""") or []
-
-                        new_msgs.append({"contact": contact, "messages": chat_texts, "chat_id": chat_id})
-                        seen_ids.add(chat_id)
-                        logger.info(f"New message from: {contact} — {len(chat_texts)} line(s)")
-
-                    except Exception as e:
-                        logger.warning(f"Chat read error: {e}")
+            new_msgs = []
+            for chat in chats:
+                try:
+                    badge = None
+                    for badge_sel in [
+                        "[data-testid='icon-unread-count']",
+                        "span[aria-label*='unread']",
+                        "span.bg-icon-unread-count",
+                    ]:
+                        found = chat.find_elements(By.CSS_SELECTOR, badge_sel)
+                        if found:
+                            badge = found[0]
+                            break
+                    if not badge:
                         continue
 
-                # Save new messages to Inbox + draft replies
-                for m in new_msgs:
-                    p_path = save_to_inbox(m)
-                    self.log_event("WA_SAVED", p_path.name)
+                    name_el = None
+                    for name_sel in [
+                        "[data-testid='cell-frame-title']",
+                        "span[title]",
+                        "span[dir='auto']",
+                    ]:
+                        found = chat.find_elements(By.CSS_SELECTOR, name_sel)
+                        if found:
+                            name_el = found[0]
+                            break
+                    contact = name_el.text.strip() if name_el else "Unknown"
 
-                # ── 2. Send approved replies (same browser session) ───────
-                approved_files = list(APPROVED_DIR.glob("WHATSAPP_REPLY_*.md"))
-                if approved_files:
-                    logger.info(f"Sending {len(approved_files)} approved reply/replies...")
-                    for filepath in approved_files:
-                        contact, message = extract_reply(filepath)
-                        if not contact or not message:
-                            continue
-                        try:
-                            # Find contact in chat list
-                            sent_ok = False
-                            # Go back to main view first
-                            page.goto(WHATSAPP_URL, wait_until="domcontentloaded", timeout=30000)
-                            time.sleep(3)
-                            _wait_for_home(page, timeout_sec=30)
+                    chat_id = f"wa_{_safe_name(contact)}_{datetime.now().strftime('%Y%m%d_%H')}"
+                    if chat_id in seen_ids:
+                        continue
 
-                            chats2 = page.query_selector_all("#pane-side [tabindex='-1']")
-                            for ch in chats2:
-                                try:
-                                    name_el = ch.query_selector("span[title], [data-testid='cell-frame-title']")
-                                    if name_el:
-                                        name = name_el.get_attribute("title") or name_el.inner_text()
-                                        if name.strip().lower() == contact.strip().lower():
-                                            ch.click()
-                                            time.sleep(3)
-                                            sent_ok = True
-                                            break
-                                except Exception:
-                                    continue
+                    chat.click()
+                    time.sleep(2)
 
-                            if not sent_ok:
-                                logger.warning(f"Contact '{contact}' not found in chat list")
-                                continue
+                    chat_texts = driver.execute_script("""
+                        const texts = [];
+                        const allRows = document.querySelectorAll('[data-testid="msg-container"]');
+                        const last = Array.from(allRows).slice(-10);
+                        for (const row of last) {
+                            const copyable = row.querySelector('.copyable-text');
+                            if (copyable) {
+                                const spans = copyable.querySelectorAll('span');
+                                let txt = '';
+                                for (const s of spans) {
+                                    if (s.children.length === 0 && s.textContent.trim()) {
+                                        txt += s.textContent.trim() + ' ';
+                                    }
+                                }
+                                txt = txt.trim();
+                                if (txt && txt.length > 1) { texts.push(txt); continue; }
+                                txt = copyable.innerText.trim();
+                                if (txt) { texts.push(txt); continue; }
+                            }
+                            const full = row.innerText.trim();
+                            if (full && full.length > 2) texts.push(full.slice(0, 400));
+                        }
+                        return texts;
+                    """) or []
 
-                            # Find message input and send
-                            msg_input = None
-                            for sel in [
-                                "div[contenteditable='true'][data-tab='10']",
-                                "[data-testid='conversation-compose-box-input']",
-                                "[aria-label='Type a message'][contenteditable='true']",
-                                "footer div[contenteditable='true']",
-                            ]:
-                                try:
-                                    el = page.wait_for_selector(sel, timeout=5000)
-                                    if el and el.is_visible():
-                                        msg_input = el
+                    new_msgs.append({"contact": contact, "messages": chat_texts, "chat_id": chat_id})
+                    seen_ids.add(chat_id)
+                    logger.info(f"New message from: {contact} — {len(chat_texts)} line(s)")
+
+                except Exception as e:
+                    logger.warning(f"Chat read error: {e}")
+                    continue
+
+            # Save new messages to Inbox + draft replies
+            for m in new_msgs:
+                p_path = save_to_inbox(m)
+                self.log_event("WA_SAVED", p_path.name)
+
+            # ── 2. Send approved replies (same browser session) ───────
+            approved_files = list(APPROVED_DIR.glob("WHATSAPP_REPLY_*.md"))
+            if approved_files:
+                logger.info(f"Sending {len(approved_files)} approved reply/replies...")
+                for filepath in approved_files:
+                    contact, message = extract_reply(filepath)
+                    if not contact or not message:
+                        continue
+                    try:
+                        driver.get(WHATSAPP_URL)
+                        time.sleep(3)
+                        _wait_for_home(driver, timeout_sec=30)
+
+                        chats2 = driver.find_elements(By.CSS_SELECTOR, "#pane-side [tabindex='-1']")
+                        sent_ok = False
+                        for ch in chats2:
+                            try:
+                                name_els = ch.find_elements(By.CSS_SELECTOR, "span[title], [data-testid='cell-frame-title']")
+                                if name_els:
+                                    name = name_els[0].get_attribute("title") or name_els[0].text
+                                    if name.strip().lower() == contact.strip().lower():
+                                        ch.click()
+                                        time.sleep(3)
+                                        sent_ok = True
                                         break
-                                except Exception:
-                                    continue
-
-                            if not msg_input:
-                                logger.warning(f"Message input not found for {contact}")
+                            except Exception:
                                 continue
 
-                            msg_input.click()
-                            time.sleep(1)
-                            for line in message.split("\n"):
-                                page.keyboard.type(line, delay=30)
-                                page.keyboard.press("Shift+Enter")
-                            time.sleep(1)
+                        if not sent_ok:
+                            logger.warning(f"Contact '{contact}' not found in chat list")
+                            continue
 
-                            send_btn = page.wait_for_selector("[data-testid='send'], [aria-label='Send']", timeout=5000)
-                            send_btn.click()
-                            time.sleep(3)
+                        _type_and_send(driver, message)
 
-                            logger.info(f"Sent to {contact}!")
-                            raw = filepath.read_text(encoding="utf-8")
-                            raw = raw.replace("status: pending_approval", "status: sent")
-                            raw += f"\n\n## Sent [{datetime.now(timezone.utc).isoformat()}]\n"
-                            (DONE_DIR / filepath.name).write_text(raw, encoding="utf-8")
-                            filepath.unlink()
-                            self.log_event("WA_SENT", filepath.name)
-                            _log("REPLY_SENT", filepath.name)
+                        logger.info(f"Sent to {contact}!")
+                        raw = filepath.read_text(encoding="utf-8")
+                        raw = raw.replace("status: pending_approval", "status: sent")
+                        raw += f"\n\n## Sent [{datetime.now(timezone.utc).isoformat()}]\n"
+                        DONE_DIR.mkdir(parents=True, exist_ok=True)
+                        (DONE_DIR / filepath.name).write_text(raw, encoding="utf-8")
+                        filepath.unlink()
+                        self.log_event("WA_SENT", filepath.name)
+                        _log("REPLY_SENT", filepath.name)
 
-                        except Exception as e:
-                            logger.error(f"Send failed for {contact}: {e}")
+                    except Exception as e:
+                        logger.error(f"Send failed for {contact}: {e}")
 
-                context.close()
-                seen_file.write_text("\n".join(seen_ids), encoding="utf-8")
-                logger.info(f"Cycle done. New: {len(new_msgs)}, Sent: {len(approved_files)}")
+            driver.quit()
+            seen_file.write_text("\n".join(seen_ids), encoding="utf-8")
+            logger.info(f"Cycle done. New: {len(new_msgs)}, Sent: {len(approved_files)}")
 
         except Exception as e:
             logger.error(f"Cycle error: {e}")
             _log("CYCLE_ERROR", str(e)[:200])
+            if driver:
+                try:
+                    driver.quit()
+                except Exception:
+                    pass
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
 
 def main():
     parser = argparse.ArgumentParser(description="AI Employee — WhatsApp Watcher")
-    parser.add_argument("--vault",      default=os.getenv("VAULT_PATH", "AI_Employee_Vault"))
-    parser.add_argument("--interval",   type=int, default=60)
-    parser.add_argument("--setup",      action="store_true")
-    parser.add_argument("--check-now",  action="store_true")
-    parser.add_argument("--send-now",   action="store_true")
-    parser.add_argument("--dry-run",    action="store_true")
+    parser.add_argument("--vault",       default=os.getenv("VAULT_PATH", "AI_Employee_Vault"))
+    parser.add_argument("--interval",    type=int, default=60)
+    parser.add_argument("--setup",       action="store_true")
+    parser.add_argument("--setup-only",  action="store_true")
+    parser.add_argument("--check-now",   action="store_true")
+    parser.add_argument("--send-now",    action="store_true")
+    parser.add_argument("--dry-run",     action="store_true")
     args = parser.parse_args()
 
     if args.dry_run:
@@ -1116,7 +1088,7 @@ def main():
         global DRY_RUN
         DRY_RUN = True
 
-    if args.setup:
+    if args.setup or args.setup_only:
         setup_session()
         return
 
