@@ -159,9 +159,11 @@ class LinkedInPoster:
 
                 # ── Create post ────────────────────────────────────────────────
                 logger.info("Going to LinkedIn feed to open post composer...")
-                page.goto("https://www.linkedin.com/feed/", timeout=60000)
-                page.wait_for_load_state("domcontentloaded")
-                time.sleep(5)
+                try:
+                    page.goto("https://www.linkedin.com/feed/", wait_until="domcontentloaded", timeout=120000)
+                except Exception:
+                    pass  # page may still be usable even if full load times out
+                time.sleep(8)
                 page.screenshot(path="debug_screenshots/li_post_new.png")
 
                 # Click "Start a post" button in the feed share box

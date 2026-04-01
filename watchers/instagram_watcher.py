@@ -297,33 +297,39 @@ class InstagramPoster:
 
                 # Upload the image via file input
                 logger.info(f"Uploading image: {img_path}")
+                uploaded = False
+
+                # Method 1: Direct set on hidden input (most reliable)
                 try:
-                    # Set file on the hidden file input
-                    with page.expect_file_chooser() as fc_info:
-                        # Try clicking "Select from computer" button
-                        for sel in [
-                            "button:has-text('Select from computer')",
-                            "button:has-text('Select from')",
-                            "input[type='file']",
-                        ]:
-                            try:
-                                el = page.wait_for_selector(sel, timeout=5000)
-                                if el:
-                                    el.click()
-                                    break
-                            except Exception:
-                                continue
-                    fc_info.value.set_files(str(img_path))
-                    logger.info("Image uploaded via file chooser.")
-                except Exception:
-                    # Fallback: set file directly on input
+                    file_input = page.query_selector("input[type='file']")
+                    if file_input:
+                        page.evaluate("el => el.removeAttribute('style')", file_input)
+                        file_input.set_input_files(str(img_path))
+                        logger.info("Image uploaded via direct input.")
+                        uploaded = True
+                except Exception as e1:
+                    logger.warning(f"Direct input failed: {e1}")
+
+                # Method 2: File chooser via button click
+                if not uploaded:
                     try:
-                        file_input = page.wait_for_selector("input[type='file']", timeout=5000)
-                        if file_input:
-                            file_input.set_input_files(str(img_path))
-                            logger.info("Image set via input[type=file].")
-                    except Exception as fe:
-                        logger.warning(f"File upload fallback failed: {fe}")
+                        with page.expect_file_chooser(timeout=10000) as fc_info:
+                            for sel in [
+                                "button:has-text('Select from computer')",
+                                "button:has-text('Select from')",
+                            ]:
+                                try:
+                                    el = page.wait_for_selector(sel, timeout=3000)
+                                    if el and el.is_visible():
+                                        el.click()
+                                        break
+                                except Exception:
+                                    continue
+                        fc_info.value.set_files(str(img_path))
+                        logger.info("Image uploaded via file chooser.")
+                        uploaded = True
+                    except Exception as e2:
+                        logger.warning(f"File chooser failed: {e2}")
 
                 time.sleep(3)
                 page.screenshot(path=str(debug_dir / "ig_3_uploaded.png"))

@@ -196,15 +196,18 @@ class TwitterPoster:
                 page = context.new_page()
 
                 logger.info("Opening X (Twitter)...")
-                page.goto("https://x.com/home", wait_until="domcontentloaded", timeout=60000)
+                try:
+                    page.goto("https://x.com/home", wait_until="domcontentloaded", timeout=120000)
+                except Exception:
+                    pass
 
                 # Wait for page to fully load — sidebar nav is a reliable signal
                 try:
-                    page.wait_for_selector("[data-testid='SideNav_NewTweet_Button']", timeout=20000)
+                    page.wait_for_selector("[data-testid='SideNav_NewTweet_Button']", timeout=40000)
                     logger.info("Home page loaded.")
                 except Exception:
                     pass
-                time.sleep(3)
+                time.sleep(6)
 
                 if "login" in page.url or "signin" in page.url:
                     browser.close()

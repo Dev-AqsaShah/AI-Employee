@@ -170,8 +170,11 @@ class FacebookPoster:
 
                 # ── Login check ────────────────────────────────────────────────
                 logger.info("Opening Facebook...")
-                page.goto("https://www.facebook.com/", wait_until="commit", timeout=60000)
-                time.sleep(4)
+                try:
+                    page.goto("https://www.facebook.com/", wait_until="domcontentloaded", timeout=120000)
+                except Exception:
+                    pass
+                time.sleep(7)
 
                 # Session expired?
                 if "login" in page.url or page.query_selector("input[name='email']"):
@@ -185,8 +188,11 @@ class FacebookPoster:
 
                 # ── Go to Facebook Page ────────────────────────────────────────
                 logger.info(f"Navigating to Page: {FACEBOOK_PAGE_URL}")
-                page.goto(FACEBOOK_PAGE_URL, wait_until="commit", timeout=60000)
-                time.sleep(4)
+                try:
+                    page.goto(FACEBOOK_PAGE_URL, wait_until="domcontentloaded", timeout=120000)
+                except Exception:
+                    pass
+                time.sleep(7)
 
                 # Screenshot 1 — page load
                 debug_dir = Path("debug_screenshots")
@@ -229,11 +235,14 @@ class FacebookPoster:
 
                 # ── Navigate to Meta Business Suite composer ───────────────────
                 logger.info("Navigating to Meta Business Suite post composer...")
-                page.goto(
-                    "https://business.facebook.com/latest/composer/",
-                    wait_until="commit", timeout=60000
-                )
-                time.sleep(5)
+                try:
+                    page.goto(
+                        "https://business.facebook.com/latest/composer/",
+                        wait_until="domcontentloaded", timeout=120000
+                    )
+                except Exception:
+                    pass
+                time.sleep(10)
                 page.screenshot(path=str(debug_dir / "fb_composer_page.png"))
                 logger.info("Screenshot: debug_screenshots/fb_composer_page.png")
 
