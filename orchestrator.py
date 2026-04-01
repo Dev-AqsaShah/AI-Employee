@@ -189,7 +189,7 @@ class DailyScheduler(threading.Thread):
         try:
             result = subprocess.run(
                 [self.python, "schedulers/linkedin_scheduler.py"],
-                capture_output=True, text=True, timeout=60
+                capture_output=True, text=True, timeout=180
             )
             if result.returncode == 0:
                 logger.info("LinkedIn scheduler complete.")

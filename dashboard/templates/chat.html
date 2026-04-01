@@ -426,10 +426,24 @@
     /* Responsive */
     @media (max-width: 640px) {
       .chat-layout { max-width: 100%; }
-      .msg-row-inner { max-width: 88%; }
+      .msg-row-inner { max-width: 92%; }
       .navbar-title { font-size: 14px; }
-      #messages-area { padding: 12px; }
-      .input-area { padding: 10px 12px 14px; }
+      #messages-area { padding: 10px; }
+      .input-area { padding: 8px 10px 12px; gap: 6px; }
+      .send-btn { width: 38px; height: 38px; }
+      #user-input { font-size: 14px; }
+      .bubble { font-size: 13px; padding: 10px 13px; }
+      .platform-selector { flex-wrap: wrap; gap: 4px; }
+      .plat-btn { padding: 3px 8px; font-size: 10px; }
+      .nav-bar { padding: 10px 12px; }
+      .upload-btn, .voice-btn { width: 34px; height: 34px; font-size: 14px; }
+      .msg-media img { max-width: 200px; }
+    }
+
+    @media (max-width: 400px) {
+      .msg-row-inner { max-width: 96%; }
+      .navbar-title { font-size: 13px; }
+      .bubble { font-size: 12px; }
     }
 
     /* Code in messages */
@@ -748,9 +762,14 @@ async function sendMessage() {
   // Show typing indicator
   setLoading(true);
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 120000); // 2 min timeout
+
   try {
-    const resp = await fetch('/api/chat', { method: 'POST', body: fd });
+    const resp = await fetch('/api/chat', { method: 'POST', body: fd, signal: controller.signal });
+    clearTimeout(timeout);
     if (resp.status === 401) {
+      setLoading(false);
       showToast('Session expired — please log in again', 'error');
       setTimeout(() => window.location.href = '/', 1500);
       return;
@@ -758,13 +777,16 @@ async function sendMessage() {
     const data = await resp.json();
     const reply = data.reply || '(no response)';
 
-    // Add to history
     history.push({ role: 'assistant', content: reply });
-
     appendMessage('assistant', reply, data.drafts_created || [], null, false);
 
   } catch (err) {
-    appendMessage('assistant', '⚠️ Error connecting to server. Please try again.', [], null, false);
+    clearTimeout(timeout);
+    if (err.name === 'AbortError') {
+      appendMessage('assistant', '⚠️ Request timed out. Please try again.', [], null, false);
+    } else {
+      appendMessage('assistant', '⚠️ Error connecting to server. Please try again.', [], null, false);
+    }
   } finally {
     setLoading(false);
   }
