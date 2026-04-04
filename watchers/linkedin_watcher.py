@@ -29,6 +29,12 @@ import argparse
 from pathlib import Path
 from datetime import datetime, timezone
 
+# Fix Unicode encoding on Windows terminal
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+
 sys.path.insert(0, str(Path(__file__).parent))
 from base_watcher import BaseWatcher
 
@@ -164,7 +170,7 @@ class LinkedInPoster:
                 except Exception:
                     pass  # page may still be usable even if full load times out
                 time.sleep(8)
-                page.screenshot(path="debug_screenshots/li_post_new.png")
+                page.screenshot(path="debug_screenshots/li_post_new.png", timeout=10000)
 
                 # Click "Start a post" button in the feed share box
                 start_post_clicked = False
@@ -197,12 +203,12 @@ class LinkedInPoster:
                         pass
 
                 if not start_post_clicked:
-                    page.screenshot(path="debug_screenshots/li_no_start_post.png")
+                    page.screenshot(path="debug_screenshots/li_no_start_post.png", timeout=10000)
                     raise RuntimeError("Could not find 'Start a post' button")
 
-                page.screenshot(path="debug_screenshots/li_1_after_click.png")
-                time.sleep(3)
-                page.screenshot(path="debug_screenshots/li_2_after_wait.png")
+                page.screenshot(path="debug_screenshots/li_1_after_click.png", timeout=10000)
+                time.sleep(8)  # Give modal more time to load
+                page.screenshot(path="debug_screenshots/li_2_after_wait.png", timeout=10000)
 
                 # Type the post content in the modal editor
                 editor = None
@@ -210,35 +216,58 @@ class LinkedInPoster:
                 # Try get_by_placeholder first (most reliable)
                 try:
                     loc = page.get_by_placeholder("What do you want to talk about?")
-                    loc.wait_for(timeout=8000)
+                    loc.wait_for(timeout=12000)
                     editor = loc
                     logger.info("Found editor via placeholder text")
                 except Exception:
                     pass
 
-                # Fallback: any contenteditable inside the modal
+                # Fallback: contenteditable inside the modal
                 if not editor:
                     try:
                         loc = page.locator("[contenteditable='true']").first
-                        loc.wait_for(timeout=5000)
+                        loc.wait_for(timeout=10000)
                         editor = loc
                         logger.info("Found editor via contenteditable locator")
                     except Exception:
                         pass
 
+                # Fallback: specific LinkedIn editor div
+                if not editor:
+                    for sel in [
+                        ".ql-editor",
+                        "[data-placeholder]",
+                        "div[role='textbox']",
+                        ".share-creation-state__text-editor [contenteditable]",
+                    ]:
+                        try:
+                            el = page.wait_for_selector(sel, timeout=5000)
+                            if el and el.is_visible():
+                                editor = el
+                                logger.info(f"Found editor via: {sel}")
+                                break
+                        except Exception:
+                            continue
+
                 # Last resort: JavaScript click on contenteditable
                 if not editor:
                     try:
-                        page.evaluate("document.querySelector('[contenteditable]').click()")
-                        page.keyboard.type(content, delay=20)
-                        time.sleep(1)
-                        logger.info("Typed content via JS click fallback")
-                        editor = True  # Mark as handled
+                        found = page.evaluate("""(() => {
+                            var el = document.querySelector('[contenteditable="true"]') ||
+                                     document.querySelector('.ql-editor');
+                            if (el) { el.click(); el.focus(); return true; }
+                            return false;
+                        })()""")
+                        if found:
+                            page.keyboard.type(content, delay=20)
+                            time.sleep(1)
+                            logger.info("Typed content via JS click fallback")
+                            editor = True  # Mark as handled
                     except Exception:
                         pass
 
                 if not editor:
-                    page.screenshot(path="debug_screenshots/li_no_editor.png")
+                    page.screenshot(path="debug_screenshots/li_no_editor.png", timeout=10000)
                     raise RuntimeError("Could not find post editor — LinkedIn may have changed their UI")
 
                 if editor is not True:

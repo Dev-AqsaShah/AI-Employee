@@ -197,7 +197,7 @@ class FacebookPoster:
                 # Screenshot 1 — page load
                 debug_dir = Path("debug_screenshots")
                 debug_dir.mkdir(exist_ok=True)
-                page.screenshot(path=str(debug_dir / "fb_1_page_loaded.png"))
+                page.screenshot(path=str(debug_dir / "fb_1_page_loaded.png"), timeout=10000)
                 logger.info(f"Screenshot saved: debug_screenshots/fb_1_page_loaded.png")
 
                 # ── Switch into Page if needed ─────────────────────────────────
@@ -209,7 +209,7 @@ class FacebookPoster:
                         # Wait for Facebook to process the switch — DON'T navigate manually
                         time.sleep(5)
                         logger.info("Switched into Page — now at: " + page.url)
-                        page.screenshot(path=str(debug_dir / "fb_1b_switched.png"))
+                        page.screenshot(path=str(debug_dir / "fb_1b_switched.png"), timeout=10000)
                         logger.info("Screenshot saved: debug_screenshots/fb_1b_switched.png")
                 except Exception:
                     pass  # Already in Page context
@@ -243,7 +243,7 @@ class FacebookPoster:
                 except Exception:
                     pass
                 time.sleep(10)
-                page.screenshot(path=str(debug_dir / "fb_composer_page.png"))
+                page.screenshot(path=str(debug_dir / "fb_composer_page.png"), timeout=10000)
                 logger.info("Screenshot: debug_screenshots/fb_composer_page.png")
 
                 # ── Dismiss any popups / tooltips ──────────────────────────────
@@ -274,7 +274,7 @@ class FacebookPoster:
                         pass
 
                 time.sleep(2)
-                page.screenshot(path=str(debug_dir / "fb_2_after_dismiss.png"))
+                page.screenshot(path=str(debug_dir / "fb_2_after_dismiss.png"), timeout=10000)
                 logger.info("Screenshot: debug_screenshots/fb_2_after_dismiss.png")
 
                 # ── Find text area in composer ─────────────────────────────────
@@ -303,14 +303,14 @@ class FacebookPoster:
                         continue
 
                 if not editor:
-                    page.screenshot(path=str(debug_dir / "fb_error_no_editor.png"))
+                    page.screenshot(path=str(debug_dir / "fb_error_no_editor.png"), timeout=10000)
                     raise RuntimeError(
                         "Could not find the post text editor. "
                         "Check debug_screenshots/fb_composer_page.png"
                     )
 
                 # Screenshot 3 — before typing
-                page.screenshot(path=str(debug_dir / "fb_3_modal.png"))
+                page.screenshot(path=str(debug_dir / "fb_3_modal.png"), timeout=10000)
                 logger.info("Screenshot: debug_screenshots/fb_3_modal.png")
 
                 # ── Type post content ──────────────────────────────────────────
@@ -320,7 +320,7 @@ class FacebookPoster:
                 time.sleep(2)
 
                 # Screenshot 4 — after typing, before submit
-                page.screenshot(path=str(debug_dir / "fb_4_before_post_btn.png"))
+                page.screenshot(path=str(debug_dir / "fb_4_before_post_btn.png"), timeout=10000)
                 logger.info("Screenshot: debug_screenshots/fb_4_before_post_btn.png")
 
                 # ── Click Publish / Post button ────────────────────────────────
@@ -357,7 +357,7 @@ class FacebookPoster:
                             continue
 
                 if not posted:
-                    page.screenshot(path=str(debug_dir / "fb_error_no_post_btn.png"))
+                    page.screenshot(path=str(debug_dir / "fb_error_no_post_btn.png"), timeout=10000)
                     raise RuntimeError("Could not find the Publish button.")
 
                 time.sleep(4)

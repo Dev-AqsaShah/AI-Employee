@@ -262,7 +262,7 @@ class InstagramPoster:
                     browser.close()
                     return {"status": "error", "message": "Session expired. Run: python watchers/instagram_watcher.py --setup"}
 
-                page.screenshot(path=str(debug_dir / "ig_1_home.png"))
+                page.screenshot(path=str(debug_dir / "ig_1_home.png"), timeout=10000)
 
                 # Dismiss popups (notifications, cookies)
                 for dismiss_text in ["Not Now", "Cancel", "Allow", "Block"]:
@@ -293,7 +293,7 @@ class InstagramPoster:
                     except Exception:
                         continue
 
-                page.screenshot(path=str(debug_dir / "ig_2_create.png"))
+                page.screenshot(path=str(debug_dir / "ig_2_create.png"), timeout=10000)
 
                 # Upload the image via file input
                 logger.info(f"Uploading image: {img_path}")
@@ -332,7 +332,7 @@ class InstagramPoster:
                         logger.warning(f"File chooser failed: {e2}")
 
                 time.sleep(3)
-                page.screenshot(path=str(debug_dir / "ig_3_uploaded.png"))
+                page.screenshot(path=str(debug_dir / "ig_3_uploaded.png"), timeout=10000)
 
                 # Click through crop / filter / Next screens
                 for _ in range(3):
@@ -347,7 +347,7 @@ class InstagramPoster:
                         except Exception:
                             pass
 
-                page.screenshot(path=str(debug_dir / "ig_4_caption.png"))
+                page.screenshot(path=str(debug_dir / "ig_4_caption.png"), timeout=10000)
 
                 # Type caption
                 caption_typed = False
@@ -371,11 +371,11 @@ class InstagramPoster:
                         continue
 
                 if not caption_typed:
-                    page.screenshot(path=str(debug_dir / "ig_error_no_caption.png"))
+                    page.screenshot(path=str(debug_dir / "ig_error_no_caption.png"), timeout=10000)
                     raise RuntimeError("Could not find caption input. Check ig_4_caption.png")
 
                 time.sleep(2)
-                page.screenshot(path=str(debug_dir / "ig_5_typed.png"))
+                page.screenshot(path=str(debug_dir / "ig_5_typed.png"), timeout=10000)
 
                 # Click Share — it's a link not a button on Instagram web
                 posted = False
@@ -408,12 +408,12 @@ class InstagramPoster:
                             continue
 
                 if not posted:
-                    page.screenshot(path=str(debug_dir / "ig_error_no_share.png"))
+                    page.screenshot(path=str(debug_dir / "ig_error_no_share.png"), timeout=10000)
                     raise RuntimeError("Could not find Share button. Check ig_5_typed.png")
 
                 # Wait for post confirmation screen
                 time.sleep(8)
-                page.screenshot(path=str(debug_dir / "ig_6_after_share.png"))
+                page.screenshot(path=str(debug_dir / "ig_6_after_share.png"), timeout=10000)
                 logger.info("Instagram post published!")
                 self._log("POST_SUCCESS", f"chars={len(content)}")
                 browser.close()

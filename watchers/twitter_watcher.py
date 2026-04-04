@@ -20,6 +20,12 @@ import os
 import re
 import sys
 import time
+
+# Fix Unicode encoding on Windows terminal
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 import logging
 import argparse
 from pathlib import Path
@@ -110,8 +116,8 @@ class TwitterPoster:
         print("\n" + "="*50)
         print("TWITTER/X SESSION SETUP")
         print("="*50)
-        print("Browser khulega — X (Twitter) pe manually login karo.")
-        print("Login ke baad terminal pe Enter dabaو — session save ho jayegi.")
+        print("Browser will open -- login to X (Twitter) manually.")
+        print("After login is complete, press Enter in terminal to save session.")
         print("="*50 + "\n")
 
         with sync_playwright() as p:
@@ -140,8 +146,11 @@ class TwitterPoster:
                 "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
             )
             page = context.new_page()
-            page.goto("https://x.com/login", wait_until="domcontentloaded", timeout=60000)
-            time.sleep(3)
+            try:
+                page.goto("https://x.com/login", wait_until="domcontentloaded", timeout=120000)
+            except Exception:
+                pass  # Page may still load even after timeout
+            time.sleep(5)
             print("X (Twitter) login karo...")
             print("NOTE: Username type karo → Next dabao → Password type karo → Login karo")
             input("\nLogin COMPLETE hone ke baad (home page dikhe) yahan Enter dabao: ")
@@ -150,6 +159,75 @@ class TwitterPoster:
 
         print(f"\nSession saved: {session_file}")
         return True
+
+    def _auto_login(self, page) -> bool:
+        """Attempt credential-based login on x.com."""
+        try:
+            page.goto("https://x.com/i/flow/login", wait_until="domcontentloaded", timeout=60000)
+            time.sleep(3)
+
+            # Enter username/email
+            for sel in ["input[name='text']", "input[autocomplete='username']", "input[type='text']"]:
+                try:
+                    el = page.wait_for_selector(sel, timeout=8000)
+                    if el and el.is_visible():
+                        el.fill(TWITTER_USERNAME)
+                        logger.info("Filled username.")
+                        break
+                except Exception:
+                    continue
+
+            # Click Next
+            try:
+                page.get_by_role("button", name="Next").click(timeout=5000)
+            except Exception:
+                try:
+                    page.keyboard.press("Enter")
+                except Exception:
+                    pass
+            time.sleep(2)
+
+            # Handle "unusual login" phone/email verify step
+            try:
+                verify_input = page.wait_for_selector("input[data-testid='ocfEnterTextTextInput']", timeout=5000)
+                if verify_input and verify_input.is_visible():
+                    logger.info("Unusual login activity check — filling username again...")
+                    verify_input.fill(TWITTER_USERNAME)
+                    page.get_by_role("button", name="Next").click(timeout=5000)
+                    time.sleep(2)
+            except Exception:
+                pass
+
+            # Enter password
+            for sel in ["input[name='password']", "input[type='password']"]:
+                try:
+                    el = page.wait_for_selector(sel, timeout=8000)
+                    if el and el.is_visible():
+                        el.fill(TWITTER_PASSWORD)
+                        logger.info("Filled password.")
+                        break
+                except Exception:
+                    continue
+
+            # Click Log in
+            try:
+                page.get_by_role("button", name="Log in").click(timeout=5000)
+            except Exception:
+                try:
+                    page.keyboard.press("Enter")
+                except Exception:
+                    pass
+            time.sleep(5)
+
+            current_url = page.url
+            logger.info(f"After login attempt — URL: {current_url}")
+            if "home" in current_url or "x.com" in current_url and "login" not in current_url:
+                logger.info("Auto-login successful.")
+                return True
+            return False
+        except Exception as e:
+            logger.error(f"Auto-login error: {e}")
+            return False
 
     def post(self, content: str) -> dict:
         if not PLAYWRIGHT_AVAILABLE:
@@ -167,6 +245,7 @@ class TwitterPoster:
         debug_dir = Path("debug_screenshots")
         debug_dir.mkdir(exist_ok=True)
 
+        browser = None
         try:
             with sync_playwright() as p:
                 browser = p.chromium.launch(
@@ -202,27 +281,108 @@ class TwitterPoster:
                     pass
 
                 # Wait for page to fully load — sidebar nav is a reliable signal
+                sidebar_found = False
                 try:
                     page.wait_for_selector("[data-testid='SideNav_NewTweet_Button']", timeout=40000)
+                    sidebar_found = True
                     logger.info("Home page loaded.")
                 except Exception:
                     pass
                 time.sleep(6)
 
-                if "login" in page.url or "signin" in page.url:
-                    browser.close()
-                    return {"status": "error", "message": "Session expired. Run --setup again"}
+                current_url = page.url
+                page_title = ""
+                try:
+                    page_title = page.title()
+                except Exception:
+                    pass
+                logger.info(f"Current URL: {current_url} | Title: {page_title}")
 
-                page.screenshot(path=str(debug_dir / "tw_1_home.png"))
+                if "login" in current_url or "signin" in current_url:
+                    logger.info("Session expired — attempting auto-login with credentials...")
+                    if not TWITTER_USERNAME or not TWITTER_PASSWORD:
+                        browser.close()
+                        return {"status": "error", "message": "Session expired and no credentials in .env"}
+                    login_ok = self._auto_login(page)
+                    if not login_ok:
+                        browser.close()
+                        return {"status": "error", "message": "Auto-login failed. Run --setup manually."}
+                    # Save refreshed session
+                    context.storage_state(path=str(session_file))
+                    logger.info("Session refreshed and saved.")
+                    sidebar_found = True  # Assume sidebar available after login
+
+                elif not sidebar_found and TWITTER_USERNAME and TWITTER_PASSWORD:
+                    # Sidebar not found even though not on login page — session may be stuck/expired
+                    logger.info("Sidebar not found — trying auto-login to refresh session...")
+                    login_ok = self._auto_login(page)
+                    if login_ok:
+                        context.storage_state(path=str(session_file))
+                        logger.info("Session refreshed after stuck state.")
+                        # Re-navigate to home after login
+                        try:
+                            page.goto("https://x.com/home", wait_until="domcontentloaded", timeout=60000)
+                        except Exception:
+                            pass
+                        time.sleep(5)
+
+                try:
+                    page.screenshot(path=str(debug_dir / "tw_1_home.png"), timeout=10000)
+                except Exception:
+                    pass
                 logger.info("Logged in. Opening tweet composer...")
 
-                # Step 1: Click the sidebar "Post" / compose button to open composer
+                # Step 1: Use keyboard shortcut 'n' to open compose (native X.com shortcut)
+                # First click somewhere safe (main area) to ensure keyboard focus
                 try:
-                    btn = page.wait_for_selector("[data-testid='SideNav_NewTweet_Button']", timeout=8000)
-                    if btn and btn.is_visible():
-                        btn.click()
-                        logger.info("Clicked sidebar compose button.")
-                        time.sleep(2)
+                    page.click("body", timeout=3000)
+                except Exception:
+                    pass
+                time.sleep(1)
+                page.keyboard.press("n")
+                logger.info("Pressed 'n' to open compose dialog.")
+                time.sleep(4)
+
+                try:
+                    page.screenshot(path=str(debug_dir / "tw_after_n_key.png"), timeout=10000)
+                except Exception:
+                    pass
+
+                # Fallback 1: Click the sidebar "Post" button
+                editor_found_via_keyboard = False
+                try:
+                    el = page.wait_for_selector("[data-testid='tweetTextarea_0']", timeout=5000)
+                    if el and el.is_visible():
+                        editor_found_via_keyboard = True
+                except Exception:
+                    pass
+
+                if not editor_found_via_keyboard:
+                    logger.info("Keyboard shortcut failed — trying sidebar button click...")
+                    try:
+                        btn = page.wait_for_selector("[data-testid='SideNav_NewTweet_Button']", timeout=10000)
+                        if btn and btn.is_visible():
+                            btn.click()
+                            logger.info("Clicked sidebar compose button.")
+                            time.sleep(5)
+                    except Exception:
+                        pass
+
+                    # Fallback 2: navigate to compose URL
+                    try:
+                        el = page.wait_for_selector("[data-testid='tweetTextarea_0']", timeout=5000)
+                        if not (el and el.is_visible()):
+                            raise Exception("not visible")
+                    except Exception:
+                        logger.info("Navigating to compose/post URL...")
+                        try:
+                            page.goto("https://x.com/compose/post", wait_until="domcontentloaded", timeout=60000)
+                            time.sleep(6)
+                        except Exception:
+                            pass
+
+                try:
+                    page.screenshot(path=str(debug_dir / "tw_after_compose_open.png"), timeout=10000)
                 except Exception:
                     pass
 
@@ -233,11 +393,11 @@ class TwitterPoster:
                     "div[aria-label='Post text'][contenteditable='true']",
                     "div[role='textbox'][contenteditable='true']",
                     "div[aria-placeholder='What is happening?!']",
-                    "div[data-offset-key][contenteditable='true']",
+                    "div[aria-placeholder=\"What's happening?\"]",
                     "div[contenteditable='true']",
                 ]:
                     try:
-                        el = page.wait_for_selector(sel, timeout=6000)
+                        el = page.wait_for_selector(sel, timeout=8000)
                         if el and el.is_visible():
                             editor = el
                             logger.info(f"Found composer: {sel}")
@@ -245,17 +405,47 @@ class TwitterPoster:
                     except Exception:
                         continue
 
+                # Last resort: JavaScript to click first contenteditable
                 if not editor:
-                    page.screenshot(path=str(debug_dir / "tw_error_no_composer.png"))
-                    raise RuntimeError("Could not find tweet composer. Check tw_1_home.png")
+                    logger.info("Trying JavaScript fallback to find editor...")
+                    try:
+                        found = page.evaluate("""(() => {
+                            var el = document.querySelector('[data-testid="tweetTextarea_0"]') ||
+                                     document.querySelector('[role="textbox"][contenteditable="true"]') ||
+                                     document.querySelector('[contenteditable="true"]');
+                            if (el) { el.click(); el.focus(); return true; }
+                            return false;
+                        })()""")
+                        if found:
+                            editor = True  # Flag: will type directly
+                            logger.info("Using JS fallback editor click.")
+                        else:
+                            try:
+                                page.screenshot(path=str(debug_dir / "tw_error_no_composer.png"), timeout=10000)
+                            except Exception:
+                                pass
+                            raise RuntimeError("Could not find tweet composer. Check tw_error_no_composer.png")
+                    except RuntimeError:
+                        raise
+                    except Exception as je:
+                        try:
+                            page.screenshot(path=str(debug_dir / "tw_error_no_composer.png"), timeout=10000)
+                        except Exception:
+                            pass
+                        raise RuntimeError(f"JS fallback failed: {je}")
+
+                if not editor:
+                    page.screenshot(path=str(debug_dir / "tw_error_no_composer.png"), timeout=10000)
+                    raise RuntimeError("Could not find tweet composer. Check tw_error_no_composer.png")
 
                 # Type tweet
-                editor.click()
-                time.sleep(1)
+                if editor is not True:
+                    editor.click()
+                    time.sleep(1)
                 page.keyboard.type(content, delay=20)
                 time.sleep(2)
 
-                page.screenshot(path=str(debug_dir / "tw_2_typed.png"))
+                page.screenshot(path=str(debug_dir / "tw_2_typed.png"), timeout=10000)
                 logger.info(f"Typed tweet ({len(content)} chars)")
 
                 # Click Post / Tweet button
@@ -274,23 +464,43 @@ class TwitterPoster:
                     except Exception:
                         continue
 
-                # CSS fallback
+                # CSS fallback — no is_enabled() check (button may look disabled if React state not updated)
                 if not posted:
                     for sel in [
                         "[data-testid='tweetButtonInline']",
                         "[data-testid='tweetButton']",
+                        "button[type='button'][data-testid]",
                     ]:
                         try:
                             el = page.wait_for_selector(sel, timeout=3000)
-                            if el and el.is_visible() and el.is_enabled():
+                            if el and el.is_visible():
                                 el.click()
                                 posted = True
+                                logger.info(f"Clicked CSS fallback: {sel}")
                                 break
                         except Exception:
                             continue
 
+                # JavaScript click fallback — find and click Post button by text
                 if not posted:
-                    page.screenshot(path=str(debug_dir / "tw_error_no_post_btn.png"))
+                    try:
+                        clicked = page.evaluate("""(() => {
+                            var btns = Array.from(document.querySelectorAll('button'));
+                            var postBtn = btns.find(b => b.textContent.trim() === 'Post' || b.textContent.trim() === 'Tweet');
+                            if (postBtn) { postBtn.click(); return true; }
+                            var tb = document.querySelector('[data-testid="tweetButtonInline"]') ||
+                                     document.querySelector('[data-testid="tweetButton"]');
+                            if (tb) { tb.click(); return true; }
+                            return false;
+                        })()""")
+                        if clicked:
+                            posted = True
+                            logger.info("Clicked Post button via JavaScript.")
+                    except Exception:
+                        pass
+
+                if not posted:
+                    page.screenshot(path=str(debug_dir / "tw_error_no_post_btn.png"), timeout=10000)
                     raise RuntimeError("Could not find Post button")
 
                 time.sleep(4)
@@ -302,6 +512,11 @@ class TwitterPoster:
         except Exception as e:
             logger.error(f"Twitter post failed: {e}")
             self._log("POST_ERROR", str(e)[:200])
+            try:
+                if browser:
+                    browser.close()
+            except Exception:
+                pass
             return {"status": "error", "message": str(e)[:200]}
 
 

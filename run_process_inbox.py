@@ -46,7 +46,7 @@ for f in pending_files:
 
     if amounts and max_amount >= 50:
         decision = "pending_approval"
-        reason   = f"Financial amount ${max_amount:,.2f} detected — handbook §2 requires approval (>=\$50)"
+        reason   = f"Financial amount ${max_amount:,.2f} detected — handbook s2 requires approval (>=50)"
     else:
         decision = "done"
         reason   = "No financial/external action required — auto-approved per handbook §5"
