@@ -1,0 +1,35 @@
+[Unit]
+Description=AI Employee Cloud Orchestrator (Platinum Tier)
+Documentation=https://github.com/Dev-AqsaShah/AI-Employee
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/AI-Employee
+ExecStart=/home/ubuntu/AI-Employee/.venv/bin/python cloud_orchestrator.py
+Restart=on-failure
+RestartSec=30
+TimeoutStopSec=30
+
+# Environment
+EnvironmentFile=/home/ubuntu/AI-Employee/.env
+Environment=PYTHONUNBUFFERED=1
+Environment=AGENT_ID=cloud
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ai-employee-cloud
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/home/ubuntu/AI-Employee
+
+[Install]
+WantedBy=multi-user.target

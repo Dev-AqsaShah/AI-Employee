@@ -6,9 +6,13 @@ Simulates the /process-inbox Agent Skill:
   4. Moves to Pending_Approval (financial >= $50) or Done
   5. Logs + updates Dashboard
 """
-import os, re
+import os, re, sys
 from pathlib import Path
 from datetime import datetime, timezone
+
+# Fix Windows console encoding
+if sys.platform == "win32":
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 VAULT        = Path("AI_Employee_Vault")
 NEEDS_ACTION = VAULT / "Needs_Action"
@@ -22,22 +26,22 @@ ts    = now.strftime("%Y-%m-%dT%H:%M:%SZ")
 today = now.strftime("%Y-%m-%d")
 
 # Step 1: read handbook
-handbook = (VAULT / "Company_Handbook.md").read_text()
-print("✓ Read Company_Handbook.md")
+handbook = (VAULT / "Company_Handbook.md").read_text(encoding="utf-8")
+print("[OK] Read Company_Handbook.md")
 
 # Step 2: find pending items
 pending_files = [
     f for f in NEEDS_ACTION.iterdir()
     if f.suffix == ".md" and f.name != ".gitkeep"
-    and "status: pending" in f.read_text()
+    and "status: pending" in f.read_text(encoding="utf-8", errors="ignore")
 ]
-print(f"✓ Found {len(pending_files)} pending item(s)")
+print(f"[OK] Found {len(pending_files)} pending item(s)")
 
 moved_to_pending = []
 moved_to_done    = []
 
 for f in pending_files:
-    content = f.read_text()
+    content = f.read_text(encoding="utf-8", errors="ignore")
     print(f"\n  Processing: {f.name}")
 
     # Step 3: assess against handbook rules
@@ -46,10 +50,10 @@ for f in pending_files:
 
     if amounts and max_amount >= 50:
         decision = "pending_approval"
-        reason   = f"Financial amount ${max_amount:,.2f} detected — handbook s2 requires approval (>=50)"
+        reason   = f"Financial amount ${max_amount:,.2f} detected -- handbook s2 requires approval (>=50)"
     else:
         decision = "done"
-        reason   = "No financial/external action required — auto-approved per handbook §5"
+        reason   = "No financial/external action required -- auto-approved per handbook 5"
 
     print(f"  Decision : {decision.upper()}")
     print(f"  Reason   : {reason}")
@@ -60,16 +64,16 @@ for f in pending_files:
 
     if decision == "pending_approval":
         dest = PENDING / f.name
-        dest.write_text(updated)
+        dest.write_text(updated, encoding="utf-8")
         f.unlink()
         moved_to_pending.append(f.name)
-        print(f"  → Moved to /Pending_Approval/")
+        print(f"  -> Moved to /Pending_Approval/")
     else:
         dest = DONE / f.name
-        dest.write_text(updated)
+        dest.write_text(updated, encoding="utf-8")
         f.unlink()
         moved_to_done.append(f.name)
-        print(f"  → Moved to /Done/")
+        print(f"  -> Moved to /Done/")
 
 # Step 5: log
 log_lines = [
@@ -82,12 +86,12 @@ for n in moved_to_done:
     log_lines.append(f"  DONE: {n}")
 
 log_path = LOGS / f"{today}.log"
-with open(log_path, "a") as lf:
+with open(log_path, "a", encoding="utf-8") as lf:
     lf.write("\n".join(log_lines) + "\n")
-print(f"\n✓ Logged to Logs/{today}.log")
+print(f"\n[OK] Logged to Logs/{today}.log")
 
 # Step 6: update Dashboard
-dash = DASHBOARD.read_text()
+dash = DASHBOARD.read_text(encoding="utf-8")
 dash = re.sub(r'- \*\*Needs Action:\*\* \d+',    "- **Needs Action:** 0",               dash)
 dash = re.sub(r'- \*\*Pending Approval:\*\* \d+', f"- **Pending Approval:** {len(moved_to_pending)}", dash)
 
@@ -98,22 +102,22 @@ def bump_done(m):
 dash = re.sub(r'- \*\*Done this week:\*\* \d+', bump_done, dash)
 
 # Add Recent Activity row
-row = f"| {now.strftime('%Y-%m-%d %H:%M:%S')} | process-inbox: {len(pending_files)} item(s) — {len(moved_to_pending)} pending approval, {len(moved_to_done)} done |"
+row = f"| {now.strftime('%Y-%m-%d %H:%M:%S')} | process-inbox: {len(pending_files)} item(s) -- {len(moved_to_pending)} pending approval, {len(moved_to_done)} done |"
 dash = dash.replace(
     "| Time (UTC)          | Action                                      |",
     "| Time (UTC)          | Action                                      |\n" + row
 )
-DASHBOARD.write_text(dash)
-print("✓ Dashboard.md updated")
+DASHBOARD.write_text(dash, encoding="utf-8")
+print("[OK] Dashboard.md updated")
 
 # Summary
 print(f"""
-╔══════════════════════════════════════════════╗
-║  /process-inbox complete                     ║
-╠══════════════════════════════════════════════╣
-║  Items processed    : {len(pending_files):<24}║
-║  → Pending Approval : {len(moved_to_pending):<24}║
-║  → Done             : {len(moved_to_done):<24}║
-║  Errors             : 0                      ║
-╚══════════════════════════════════════════════╝
+==============================================
+  /process-inbox complete
+==============================================
+  Items processed    : {len(pending_files)}
+  -> Pending Approval: {len(moved_to_pending)}
+  -> Done            : {len(moved_to_done)}
+  Errors             : 0
+==============================================
 """)

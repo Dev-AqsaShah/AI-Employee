@@ -1,0 +1,20 @@
+[Unit]
+Description=AI Employee Vault Sync (Git — Platinum Tier)
+After=network-online.target ai-employee-cloud.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/AI-Employee
+ExecStart=/home/ubuntu/AI-Employee/.venv/bin/python scripts/sync_vault.py --watch --interval 300
+Restart=on-failure
+RestartSec=60
+EnvironmentFile=/home/ubuntu/AI-Employee/.env
+Environment=AGENT_ID=cloud
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ai-employee-vault-sync
+
+[Install]
+WantedBy=multi-user.target
