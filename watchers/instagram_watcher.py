@@ -19,6 +19,10 @@ Usage:
 import os
 import re
 import sys
+# Fix Windows console encoding
+if sys.platform == "win32":
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 import time
 import logging
 import argparse
@@ -155,8 +159,8 @@ class InstagramPoster:
         print("\n" + "="*50)
         print("INSTAGRAM SESSION SETUP")
         print("="*50)
-        print("Browser khulega — Instagram pe manually login karo.")
-        print("Login ke baad terminal pe Enter dabaو — session save ho jayegi.")
+        print("Browser will open -- log in to Instagram manually.")
+        print("After login, press Enter in terminal -- session will be saved.")
         print("="*50 + "\n")
 
         with sync_playwright() as p:
