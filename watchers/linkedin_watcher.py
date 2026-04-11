@@ -222,7 +222,33 @@ class LinkedInPoster:
                     raise RuntimeError("Could not find 'Start a post' button")
 
                 page.screenshot(path="debug_screenshots/li_1_after_click.png", timeout=10000)
-                time.sleep(8)  # Give modal more time to load
+
+                # Wait for modal/dialog to appear
+                modal_found = False
+                for modal_sel in [
+                    "div[role='dialog']",
+                    ".share-creation-state",
+                    ".share-box-v2__scroll-content",
+                    ".artdeco-modal",
+                ]:
+                    try:
+                        page.wait_for_selector(modal_sel, timeout=10000)
+                        logger.info(f"Modal found: {modal_sel}")
+                        modal_found = True
+                        break
+                    except Exception:
+                        continue
+
+                if not modal_found:
+                    # Try clicking the Start a post area again (sometimes needs double click)
+                    try:
+                        page.get_by_role("button", name="Start a post").click(timeout=5000)
+                        logger.info("Re-clicked Start a post")
+                        time.sleep(3)
+                    except Exception:
+                        pass
+
+                time.sleep(5)
                 page.screenshot(path="debug_screenshots/li_2_after_wait.png", timeout=10000)
 
                 # Type the post content in the modal editor
@@ -231,13 +257,23 @@ class LinkedInPoster:
                 # Try get_by_placeholder first (most reliable)
                 try:
                     loc = page.get_by_placeholder("What do you want to talk about?")
-                    loc.wait_for(timeout=12000)
+                    loc.wait_for(timeout=15000)
                     editor = loc
                     logger.info("Found editor via placeholder text")
                 except Exception:
                     pass
 
-                # Fallback: contenteditable inside the modal
+                # Fallback: contenteditable inside dialog
+                if not editor:
+                    try:
+                        loc = page.locator("div[role='dialog'] [contenteditable='true']").first
+                        loc.wait_for(timeout=10000)
+                        editor = loc
+                        logger.info("Found editor via dialog contenteditable")
+                    except Exception:
+                        pass
+
+                # Fallback: any contenteditable on page
                 if not editor:
                     try:
                         loc = page.locator("[contenteditable='true']").first
@@ -251,8 +287,8 @@ class LinkedInPoster:
                 if not editor:
                     for sel in [
                         ".ql-editor",
-                        "[data-placeholder]",
                         "div[role='textbox']",
+                        "[data-placeholder='What do you want to talk about?']",
                         ".share-creation-state__text-editor [contenteditable]",
                     ]:
                         try:
@@ -269,7 +305,8 @@ class LinkedInPoster:
                     try:
                         found = page.evaluate("""(() => {
                             var el = document.querySelector('[contenteditable="true"]') ||
-                                     document.querySelector('.ql-editor');
+                                     document.querySelector('.ql-editor') ||
+                                     document.querySelector('div[role="textbox"]');
                             if (el) { el.click(); el.focus(); return true; }
                             return false;
                         })()""")

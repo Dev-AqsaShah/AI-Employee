@@ -310,6 +310,43 @@ def api_auth_status():
     return jsonify({"logged_in": bool(flask_session.get("logged_in"))})
 
 
+def _trigger_watcher(filename: str):
+    """Run the appropriate watcher --post-now in background after approval."""
+    import threading
+    name_upper = filename.upper()
+    if "TWITTER" in name_upper:
+        watcher = "watchers/twitter_watcher.py"
+    elif "INSTAGRAM" in name_upper:
+        watcher = "watchers/instagram_watcher.py"
+    elif "FACEBOOK" in name_upper:
+        watcher = "watchers/facebook_watcher.py"
+    elif "LINKEDIN" in name_upper:
+        watcher = "watchers/linkedin_watcher.py"
+    elif "WHATSAPP" in name_upper:
+        watcher = "watchers/whatsapp_watcher.py"
+    else:
+        return
+
+    script = BASE_DIR / watcher
+    if not script.exists():
+        return
+
+    def run():
+        try:
+            proc = subprocess.Popen(
+                [sys.executable, str(script), "--post-now"],
+                cwd=str(BASE_DIR),
+                env={**os.environ},
+            )
+            proc.wait()
+        except Exception as e:
+            print(f"[Dashboard] Watcher trigger failed: {e}")
+
+    t = threading.Thread(target=run, daemon=True)
+    t.start()
+    print(f"[Dashboard] Triggered watcher for: {filename}")
+
+
 @app.route("/api/approve/<filename>", methods=["POST"])
 @login_required
 def api_approve(filename):
@@ -317,6 +354,7 @@ def api_approve(filename):
     dest = APPROVED_DIR / filename
     if src.exists():
         shutil.move(str(src), str(dest))
+        _trigger_watcher(filename)
         return jsonify({"status": "approved", "file": filename})
     return jsonify({"error": "File not found"}), 404
 

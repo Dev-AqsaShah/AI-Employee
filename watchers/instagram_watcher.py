@@ -389,35 +389,58 @@ class InstagramPoster:
                 time.sleep(2)
                 page.screenshot(path=str(debug_dir / "ig_5_typed.png"), timeout=10000)
 
-                # Click Share — it's a link not a button on Instagram web
+                # Click Share — try all known selectors
                 posted = False
-                # Try link first (Instagram uses <a> for Share)
+
+                # Try div[role='button'] with Share text (Instagram 2024+ uses this)
                 for sel in [
+                    "div[role='button']:has-text('Share')",
                     "a:has-text('Share')",
                     "[role='link']:has-text('Share')",
+                    "div:has-text('Share'):not(:has(*))",
+                    "[aria-label='Share']",
                 ]:
                     try:
                         el = page.wait_for_selector(sel, timeout=3000)
                         if el and el.is_visible():
+                            el.scroll_into_view_if_needed()
+                            time.sleep(0.5)
                             el.click()
                             posted = True
-                            logger.info(f"Clicked Share link: {sel}")
+                            logger.info(f"Clicked Share: {sel}")
                             break
                     except Exception:
                         continue
 
-                # Fallback: button
+                # Fallback: button role
                 if not posted:
                     for btn_name in ["Share", "Post", "Publish"]:
                         try:
                             btn = page.get_by_role("button", name=btn_name)
                             if btn.is_visible(timeout=3000) and btn.is_enabled():
+                                btn.scroll_into_view_if_needed()
+                                time.sleep(0.5)
                                 btn.click()
                                 posted = True
-                                logger.info(f"Clicked: '{btn_name}'")
+                                logger.info(f"Clicked button: '{btn_name}'")
                                 break
                         except Exception:
                             continue
+
+                # Last resort: JS click on Share
+                if not posted:
+                    try:
+                        found = page.evaluate("""() => {
+                            const els = [...document.querySelectorAll('div[role=button], a, button')];
+                            const share = els.find(e => e.textContent.trim() === 'Share' && e.offsetParent !== null);
+                            if (share) { share.click(); return true; }
+                            return false;
+                        }""")
+                        if found:
+                            posted = True
+                            logger.info("Clicked Share via JS fallback")
+                    except Exception:
+                        pass
 
                 if not posted:
                     page.screenshot(path=str(debug_dir / "ig_error_no_share.png"), timeout=10000)

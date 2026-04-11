@@ -161,14 +161,27 @@ class FacebookPoster:
 
         try:
             with sync_playwright() as p:
-                logger.info("Launching browser (headless)...")
+                logger.info("Launching browser...")
                 browser = p.chromium.launch(
-                    headless=True,
-                    args=["--no-sandbox", "--disable-dev-shm-usage"],
+                    headless=False,
+                    args=[
+                        "--no-sandbox",
+                        "--disable-dev-shm-usage",
+                        "--start-maximized",
+                        "--disable-blink-features=AutomationControlled",
+                    ],
                 )
                 context = browser.new_context(
                     storage_state=str(session_file),
-                    viewport={"width": 1280, "height": 800},
+                    viewport={"width": 1280, "height": 900},
+                    user_agent=(
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                        "AppleWebKit/537.36 (KHTML, like Gecko) "
+                        "Chrome/122.0.0.0 Safari/537.36"
+                    ),
+                )
+                context.add_init_script(
+                    "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
                 )
                 page = context.new_page()
 
@@ -238,15 +251,23 @@ class FacebookPoster:
                         continue
 
                 # ── Navigate to Meta Business Suite composer ───────────────────
-                logger.info("Navigating to Meta Business Suite post composer...")
-                try:
-                    page.goto(
-                        "https://business.facebook.com/latest/composer/",
-                        wait_until="domcontentloaded", timeout=120000
-                    )
-                except Exception:
-                    pass
-                time.sleep(10)
+                logger.info("Navigating to Meta Business Suite composer...")
+                for attempt in range(3):
+                    try:
+                        page.goto(
+                            "https://business.facebook.com/latest/composer/",
+                            wait_until="domcontentloaded", timeout=60000
+                        )
+                    except Exception:
+                        pass
+                    time.sleep(8)
+                    # Check if page loaded (not blank)
+                    body_text = page.evaluate("() => document.body.innerText") or ""
+                    if len(body_text.strip()) > 50:
+                        logger.info(f"Composer loaded (attempt {attempt+1})")
+                        break
+                    logger.info(f"Composer blank, retrying ({attempt+1}/3)...")
+                    time.sleep(5)
                 page.screenshot(path=str(debug_dir / "fb_composer_page.png"), timeout=10000)
                 logger.info("Screenshot: debug_screenshots/fb_composer_page.png")
 
@@ -281,19 +302,21 @@ class FacebookPoster:
                 page.screenshot(path=str(debug_dir / "fb_2_after_dismiss.png"), timeout=10000)
                 logger.info("Screenshot: debug_screenshots/fb_2_after_dismiss.png")
 
+                # Meta Business Suite composer is already open — no extra click needed
+                logger.info("Meta Business Suite composer ready")
+
                 # ── Find text area in composer ─────────────────────────────────
-                # Meta Business Suite composer has a textarea under "Text" label
                 logger.info("Finding post text area...")
                 editor = None
 
                 editor_selectors = [
-                    "textarea[placeholder]",                          # plain textarea
-                    "textarea",                                       # any textarea
-                    "div[contenteditable='true'][spellcheck='true']", # rich text
-                    "div[data-lexical-editor='true']",                # Lexical editor
-                    "div[role='textbox'][contenteditable='true']",    # ARIA textbox
-                    "div[contenteditable='true']",                    # any contenteditable
-                    "div[role='textbox']",                            # role textbox
+                    "div[role='textbox'][contenteditable='true']",
+                    "div[contenteditable='true'][spellcheck='true']",
+                    "div[data-lexical-editor='true']",
+                    "div[contenteditable='true']",
+                    "div[role='textbox']",
+                    "textarea[placeholder]",
+                    "textarea",
                 ]
 
                 for ed_sel in editor_selectors:
@@ -329,12 +352,15 @@ class FacebookPoster:
 
                 # ── Click Publish / Post button ────────────────────────────────
                 posted = False
+                time.sleep(2)
 
-                # "Publish" is the button in Meta Business Suite
+                # Try by role button
                 for btn_name in ["Publish", "Post", "Share"]:
                     try:
                         btn = page.get_by_role("button", name=btn_name)
                         if btn.is_visible(timeout=3000) and btn.is_enabled():
+                            btn.scroll_into_view_if_needed()
+                            time.sleep(1)
                             btn.click()
                             posted = True
                             logger.info(f"Clicked: '{btn_name}'")
@@ -342,7 +368,7 @@ class FacebookPoster:
                     except Exception:
                         continue
 
-                # CSS fallback
+                # CSS selector fallback
                 if not posted:
                     for sel in [
                         "button:has-text('Publish')",
@@ -353,6 +379,8 @@ class FacebookPoster:
                         try:
                             el = page.wait_for_selector(sel, timeout=3000)
                             if el and el.is_visible() and el.is_enabled():
+                                el.scroll_into_view_if_needed()
+                                time.sleep(1)
                                 el.click()
                                 posted = True
                                 logger.info(f"Clicked (CSS): {sel}")
@@ -360,11 +388,30 @@ class FacebookPoster:
                         except Exception:
                             continue
 
+                # JS click fallback — find any blue Publish/Post button
+                if not posted:
+                    try:
+                        result = page.evaluate("""() => {
+                            const btns = [...document.querySelectorAll('button, div[role=button]')];
+                            const pub = btns.find(b =>
+                                b.textContent.trim() === 'Publish' ||
+                                b.textContent.trim() === 'Post' ||
+                                b.getAttribute('aria-label') === 'Publish'
+                            );
+                            if (pub) { pub.scrollIntoView(); pub.click(); return true; }
+                            return false;
+                        }""")
+                        if result:
+                            posted = True
+                            logger.info("Clicked Publish via JS fallback")
+                    except Exception:
+                        pass
+
                 if not posted:
                     page.screenshot(path=str(debug_dir / "fb_error_no_post_btn.png"), timeout=10000)
                     raise RuntimeError("Could not find the Publish button.")
 
-                time.sleep(4)
+                time.sleep(6)
                 logger.info("Facebook post published!")
                 self._log("POST_SUCCESS", f"chars={len(content)}")
                 browser.close()
