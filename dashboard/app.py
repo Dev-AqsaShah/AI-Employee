@@ -400,7 +400,7 @@ def api_draft(platform):
     try:
         result = subprocess.run(
             [sys.executable, script, "--force"],
-            capture_output=True, text=True, cwd=str(BASE_DIR), timeout=60
+            capture_output=True, text=True, cwd=str(BASE_DIR), timeout=180
         )
         if result.returncode == 0:
             return jsonify({"status": "drafted", "platform": platform})
