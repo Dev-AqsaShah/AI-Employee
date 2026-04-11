@@ -121,29 +121,20 @@ class TwitterPoster:
         print("="*50 + "\n")
 
         with sync_playwright() as p:
-            browser = p.chromium.launch(
-                headless=(sys.platform != "win32"),
-                args=[
-                    "--no-sandbox",
-                    "--start-maximized",
-                    "--disable-blink-features=AutomationControlled",
-                    "--disable-infobars",
-                    "--disable-dev-shm-usage",
-                ],
+            # Use Firefox — Twitter doesn't detect it as automation
+            browser = p.firefox.launch(
+                headless=False,
+                firefox_user_prefs={
+                    "general.useragent.override": (
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:124.0) "
+                        "Gecko/20100101 Firefox/124.0"
+                    )
+                },
             )
             context = browser.new_context(
                 viewport={"width": 1280, "height": 800},
-                user_agent=(
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/122.0.0.0 Safari/537.36"
-                ),
                 locale="en-US",
                 timezone_id="Asia/Karachi",
-            )
-            # Hide webdriver flag so Twitter doesn't detect Playwright
-            context.add_init_script(
-                "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
             )
             page = context.new_page()
             try:
@@ -155,6 +146,7 @@ class TwitterPoster:
             print("NOTE: Username type karo → Next dabao → Password type karo → Login karo")
             input("\nLogin COMPLETE hone ke baad (home page dikhe) yahan Enter dabao: ")
             context.storage_state(path=str(session_file))
+            context.close()
             browser.close()
 
         print(f"\nSession saved: {session_file}")

@@ -2,7 +2,7 @@
 type: instagram_post
 topic: Full Stack development tips and tricks
 drafted: 2026-04-07T03:48:45.099747+00:00
-status: pending_approval
+status: posted
 char_count: 768
 ---
 
@@ -40,3 +40,7 @@ Which tip hit hardest? Drop your best full stack hack below 👇
 - **APPROVE:** Move this file to `/Approved/` — Instagram Watcher will auto-post it
 - **EDIT:** Edit the Post Content above, then move to `/Approved/`
 - **REJECT:** Move this file to `/Rejected/`
+
+
+## Posted [2026-04-10T06:08:38.319930+00:00]
+- **Result:** DRY RUN — post not sent

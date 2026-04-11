@@ -2,7 +2,7 @@
 type: instagram_post
 topic: AI tools for developers
 drafted: 2026-04-04T04:26:46.042333+00:00
-status: pending_approval
+status: posted
 char_count: 897
 ---
 
@@ -40,3 +40,7 @@ Which AI tool has saved you the most time as a developer? Drop it below 👇
 - **APPROVE:** Move this file to `/Approved/` — Instagram Watcher will auto-post it
 - **EDIT:** Edit the Post Content above, then move to `/Approved/`
 - **REJECT:** Move this file to `/Rejected/`
+
+
+## Posted [2026-04-08T17:50:29.143853+00:00]
+- **Result:** DRY RUN — post not sent

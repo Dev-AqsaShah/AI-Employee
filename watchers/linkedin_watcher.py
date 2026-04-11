@@ -165,11 +165,16 @@ class LinkedInPoster:
 
                 # ── Create post ────────────────────────────────────────────────
                 logger.info("Going to LinkedIn feed to open post composer...")
-                try:
-                    page.goto("https://www.linkedin.com/feed/", wait_until="domcontentloaded", timeout=120000)
-                except Exception:
-                    pass  # page may still be usable even if full load times out
-                time.sleep(8)
+                for attempt in range(3):
+                    try:
+                        page.goto("https://www.linkedin.com/feed/", wait_until="domcontentloaded", timeout=60000)
+                    except Exception:
+                        pass
+                    time.sleep(5)
+                    if "feed" in page.url:
+                        break
+                    logger.info(f"Not on feed page (got {page.url}), retrying...")
+                    time.sleep(3)
                 page.screenshot(path="debug_screenshots/li_post_new.png", timeout=10000)
 
                 # Click "Start a post" button in the feed share box
@@ -183,7 +188,7 @@ class LinkedInPoster:
                 ]:
                     try:
                         btn = page.wait_for_selector(sel, timeout=5000)
-                        if btn:
+                        if btn and btn.is_visible():
                             btn.click()
                             logger.info(f"Clicked 'Start a post' with selector: {sel}")
                             start_post_clicked = True
@@ -193,9 +198,19 @@ class LinkedInPoster:
                         continue
 
                 if not start_post_clicked:
-                    # Fallback: click by visible text
+                    # Fallback: click by role button with name
                     try:
-                        page.get_by_text("Start a post").first.click(timeout=5000)
+                        page.get_by_role("button", name="Start a post").click(timeout=5000)
+                        start_post_clicked = True
+                        logger.info("Clicked 'Start a post' via role button")
+                        time.sleep(3)
+                    except Exception:
+                        pass
+
+                if not start_post_clicked:
+                    # Fallback: click by visible text (strict=False to avoid multiple match error)
+                    try:
+                        page.locator("text=Start a post").first.click(timeout=5000)
                         start_post_clicked = True
                         logger.info("Clicked 'Start a post' via text search")
                         time.sleep(3)

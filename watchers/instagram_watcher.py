@@ -335,22 +335,30 @@ class InstagramPoster:
                     except Exception as e2:
                         logger.warning(f"File chooser failed: {e2}")
 
-                time.sleep(3)
+                # Wait for spinner to disappear after upload (up to 20s)
+                try:
+                    page.wait_for_selector("svg[aria-label='Loading...']", timeout=5000)
+                    page.wait_for_selector("svg[aria-label='Loading...']", state="hidden", timeout=20000)
+                    logger.info("Upload spinner gone — image processed")
+                except Exception:
+                    pass
+                time.sleep(4)
                 page.screenshot(path=str(debug_dir / "ig_3_uploaded.png"), timeout=10000)
 
                 # Click through crop / filter / Next screens
-                for _ in range(3):
+                for _ in range(4):
                     for btn_name in ["Next", "Crop", "OK"]:
                         try:
                             btn = page.get_by_role("button", name=btn_name)
-                            if btn.is_visible(timeout=2000) and btn.is_enabled():
+                            if btn.is_visible(timeout=3000) and btn.is_enabled():
                                 btn.click()
                                 logger.info(f"Clicked: '{btn_name}'")
-                                time.sleep(2)
+                                time.sleep(3)
                                 break
                         except Exception:
                             pass
 
+                time.sleep(3)
                 page.screenshot(path=str(debug_dir / "ig_4_caption.png"), timeout=10000)
 
                 # Type caption
@@ -415,8 +423,26 @@ class InstagramPoster:
                     page.screenshot(path=str(debug_dir / "ig_error_no_share.png"), timeout=10000)
                     raise RuntimeError("Could not find Share button. Check ig_5_typed.png")
 
-                # Wait for post confirmation screen
-                time.sleep(8)
+                # Wait for "Sharing..." spinner to disappear (up to 60s)
+                try:
+                    page.wait_for_selector("div:has-text('Sharing')", timeout=5000)
+                    logger.info("Sharing in progress — waiting...")
+                    page.wait_for_selector("div:has-text('Sharing')", state="hidden", timeout=60000)
+                    logger.info("Sharing complete!")
+                except Exception:
+                    pass
+
+                # Also wait for success confirmation text
+                try:
+                    page.wait_for_selector(
+                        "span:has-text('Your post has been shared'), div:has-text('Post shared')",
+                        timeout=15000
+                    )
+                    logger.info("Got post shared confirmation!")
+                except Exception:
+                    pass
+
+                time.sleep(5)
                 page.screenshot(path=str(debug_dir / "ig_6_after_share.png"), timeout=10000)
                 logger.info("Instagram post published!")
                 self._log("POST_SUCCESS", f"chars={len(content)}")
